@@ -530,17 +530,21 @@ export default function Dashboard() {
         a:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; border-radius: 2px; }
         .del-btn:hover { color: ${C.error} !important; background: rgba(255,68,85,0.1) !important; }
 
-        /* ── Mobile ── */
+        /* ── Layout ── */
+        .main-content { margin-left: 240px; padding: 40px 48px; min-height: 100vh; max-width: calc(100vw - 240px); flex: 1; }
         .mobile-header { display: none; }
         .bottom-tab-nav { display: none; }
+
+        /* ── Mobile ── */
         @media (max-width: 767px) {
           .desktop-sidebar { display: none !important; }
+          .main-content { margin-left: 0 !important; padding: 72px 16px 80px !important; max-width: 100vw !important; }
           .mobile-header {
             display: flex !important;
             position: fixed; top: 0; left: 0; right: 0; z-index: 110;
             height: 56px; padding: 0 16px;
             background: rgba(7,7,14,0.97); border-bottom: 1px solid ${C.border};
-            backdropFilter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
             align-items: center; justify-content: space-between;
           }
           .bottom-tab-nav {
@@ -548,29 +552,19 @@ export default function Dashboard() {
             position: fixed; bottom: 0; left: 0; right: 0; z-index: 110;
             height: 64px;
             background: rgba(7,7,14,0.97); border-top: 1px solid ${C.border};
-            backdropFilter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
           }
-          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; margin-bottom: 20px !important; }
+          .stats-grid > *:last-child:nth-child(odd) { grid-column: 1 / -1; }
           .charts-row { display: none !important; }
+          .section-header { margin-bottom: 12px !important; margin-top: 4px !important; }
           .source-form-grid { grid-template-columns: 1fr !important; }
           .item-row { flex-wrap: wrap !important; }
           .item-row-scores { display: none !important; }
           .item-row-right { width: 100%; justify-content: space-between !important;
             border-top: 1px solid ${C.border}; padding-top: 10px; margin-top: 4px; }
-          .section-header { margin-top: 0 !important; }
           .queue-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 10px !important; }
-          .queue-row-actions { width: 100%; border-top: 1px solid ${C.border};
-            padding-top: 10px; display: flex; gap: 8px; }
-          .stats-grid > *:last-child:nth-child(odd) { grid-column: 1 / -1; }
-          .main-content {
-            margin-left: 240px; padding: 40px 48px;
-            min-height: 100vh; max-width: calc(100vw - 240px); flex: 1;
-          }
-          @media (max-width: 767px) {
-            .main-content { margin-left: 0 !important; padding: 72px 16px 80px !important; max-width: 100vw !important; }
-            .stats-grid { gap: 10px !important; margin-bottom: 20px !important; }
-            .section-header { margin-bottom: 12px !important; margin-top: 4px !important; }
-          }
+          .queue-row-actions { flex-basis: 100%; border-top: 1px solid ${C.border}; padding-top: 10px; }
         }
       `}</style>
 
@@ -835,7 +829,7 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  <div className="queue-row-actions" style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <div className="queue-row-actions" style={{ display: "flex", gap: 8 }}>
                     {item.status === "draft" && <>
                       <button
                         aria-label="Approve content"
