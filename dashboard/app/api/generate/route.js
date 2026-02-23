@@ -42,39 +42,30 @@ Structure the post in this exact order:
 ${idea}
 </idea>`;
 
-const PROMPT_TEMPLATE = (idea) => `<role>
-Act as a Knowledgeable Friend and Expert Content Creator who excels at explaining complex concepts simply.
-</role>
+const PROMPT_TEMPLATE = (idea) => `# Role & Tone
+Act as an expert crypto content creator and a knowledgeable friend. Your tone should be engaging, insightful, and natural for a Thai crypto-native audience. Write in a conversational Thai style, avoiding robotic wording or direct-translation phrasing.
 
-<task>
-Create a highly informative and engaging Facebook post written in natural, fluent Thai based on the provided <idea>.
-</task>
+# Task
+Analyze the provided <resource> and create a highly engaging, mobile-friendly crypto news summary based strictly on the content provided.
 
-<guidelines>
-- Tone: Friendly, sincere, and grounded. Speak like a real person having a helpful conversation, not a corporate brochure.
-- Value-Driven: Focus on being informative. The reader must walk away feeling like they learned something genuinely useful.
-- Audience: General Thai social media users browsing on their phones.
-</guidelines>
+# Strict Constraints
+- Language: Natural Thai.
+- Length: Minimum 700 Thai characters.
+- Formatting: No em-dash (—), use short paragraphs optimized for mobile reading (2-3 lines max per paragraph).
+- Style: Simplify complex crypto technical jargon (e.g., FOCIL, Cypherpunk, Mempool) so a general user can easily understand, while keeping the core meaning accurate.
+- Content: NO puffery, NO filler words, NO fluff. Get straight to the facts.
+- Restriction: DO NOT invent information. DO NOT add any extra sections or headings that are not explicitly requested below.
 
-<strict_constraints>
-- NO Jargon: Translate any technical terms into "everyday" Thai. If a technical term must be used, explain it immediately in simple terms.
-- NO Em-dashes: Do not use the "—" or "-" symbol as a sentence separator.
-- NO Puffery: Avoid exaggerated adjectives (e.g., "the most amazing," "revolutionary," "unbelievable," "สุดยอด"). Show, don't tell—if something is good, explain *why* using facts.
-- NO AI Filler: Output ONLY the text of the Facebook post. Do not include introductory remarks, explanations, or conclusions (e.g., do not say "Here is the post:").
-- Depth Requirement: Write at least 700 Thai characters with practical context and concrete details.
-</strict_constraints>
+# Required Structure
+1. Hook: Start with 1-2 punchy, scroll-stopping sentences. DO NOT use cliche openings like "ข่าวร้อนในวงการคริปโต". Hook the reader with the core impact or a thought-provoking angle.
+2. Body & Key Takeaways: Summarize the key events using at least 5 bullet points. You MUST use varied and context-relevant emojis for each bullet (do not just repeat the same emoji). Make the bullets punchy and informative.
+3. ทำไมเรื่องนี้สำคัญ: (Use this exact heading). Explain the core impact and why the audience should care.
+4. ต้องระวังอะไร: (Use this exact heading). Highlight the risks, criticisms, or potential downsides mentioned in the text.
+5. Ending CTA: End with a single, engaging question to encourage community discussion.
 
-<format_requirements>
-- Hook: Start with a clear, relatable, attention-grabbing opening sentence.
-- Readability: Use short paragraphs (2-3 sentences max) tailored for mobile viewing. Absolutely no walls of text.
-- Organization: Use simple emojis (like ✅, 📌, or 💡) as bullet points to break down key facts or steps. Include at least 5 bullets in total.
-- Substance: Include at least one mini-explanation section ("ทำไมเรื่องนี้สำคัญ") and one risk section ("ต้องระวังอะไร").
-- Call to Action: End with a single, friendly question to encourage comments and engagement.
-</format_requirements>
-
-<idea>
+<resource>
 ${idea}
-</idea>`;
+</resource>`;
 
 export async function POST(request) {
   try {
