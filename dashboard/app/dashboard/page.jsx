@@ -91,9 +91,13 @@ export default function Dashboard() {
   const [rawItems,  setRawItems]  = useState([]);
   const [genItems,  setGenItems]  = useState([]);
   const [runs,      setRuns]      = useState([]);
-  const [tab,       setTab]       = useState("queue");  // queue | raw | runs
-  const [loading,   setLoading]   = useState(true);
-  const [selected,  setSelected]  = useState(null);
+  const [tab,         setTab]         = useState("queue");  // queue | raw | runs | sources
+  const [loading,     setLoading]     = useState(true);
+  const [selected,    setSelected]    = useState(null);
+  const [sources,     setSources]     = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSource,   setNewSource]   = useState({ type: "rss", value: "", category: "" });
+  const [sourceError, setSourceError] = useState("");
 
   const loadData = useCallback(async () => {
     const [rawRes, genRes, runsRes] = await Promise.all([
@@ -129,9 +133,14 @@ export default function Dashboard() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const loadSources = useCallback(async () => {
+    const { data } = await supabase.from("sources").select("*").order("created_at", { ascending: true });
+    setSources(data ?? []);
+  }, []);
 
-  // Real-time subscription
+  useEffect(() => { loadData(); loadSources(); }, [loadData, loadSources]);
+
+  // Real-time subscription — content tables
   useEffect(() => {
     const channel = supabase
       .channel("dashboard")
@@ -140,10 +149,43 @@ export default function Dashboard() {
     return () => supabase.removeChannel(channel);
   }, [loadData]);
 
+  // Real-time subscription — sources table
+  useEffect(() => {
+    const channel = supabase
+      .channel("sources-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "sources" }, loadSources)
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [loadSources]);
+
   // Update content status
   const updateStatus = async (id, status) => {
     await supabase.from("generated_content").update({ status }).eq("id", id);
     loadData();
+  };
+
+  // Sources CRUD
+  const toggleSource = async (id, enabled) => {
+    await supabase.from("sources").update({ enabled: !enabled }).eq("id", id);
+  };
+
+  const deleteSource = async (id) => {
+    await supabase.from("sources").delete().eq("id", id);
+  };
+
+  const addSource = async () => {
+    setSourceError("");
+    if (!newSource.value.trim()) { setSourceError("Value is required"); return; }
+    if (!newSource.category.trim()) { setSourceError("Category is required"); return; }
+    const value = newSource.type === "x_account"
+      ? newSource.value.replace(/^@/, "").trim()
+      : newSource.value.trim();
+    const { error } = await supabase.from("sources").insert({
+      type: newSource.type, value, category: newSource.category.trim(), enabled: true,
+    });
+    if (error) { setSourceError(error.message); return; }
+    setNewSource({ type: "rss", value: "", category: "" });
+    setShowAddForm(false);
   };
 
   // Chart data — runs per day
@@ -268,7 +310,7 @@ export default function Dashboard() {
         {/* ── Tabs ── */}
         <div style={{ display: "flex", gap: 4, marginBottom: 24,
           borderBottom: `1px solid ${C.border}`, paddingBottom: 0 }}>
-          {["queue", "raw", "runs"].map(t => (
+          {["queue", "raw", "runs", "sources"].map(t => (
             <button key={t} onClick={() => setTab(t)} style={{
               background: "none", border: "none", cursor: "pointer",
               padding: "10px 20px",
@@ -278,7 +320,10 @@ export default function Dashboard() {
               borderBottom: tab === t ? `2px solid ${C.accent}` : "2px solid transparent",
               marginBottom: -1, transition: "all 0.15s",
             }}>
-              {t === "queue" ? `Content Queue (${stats?.drafts})` : t === "raw" ? `Raw Feed (${rawItems.length})` : "Pipeline Runs"}
+              {t === "queue"   ? `Content Queue (${stats?.drafts})`
+               : t === "raw"   ? `Raw Feed (${rawItems.length})`
+               : t === "runs"  ? "Pipeline Runs"
+               : `Sources (${sources.length})`}
             </button>
           ))}
         </div>
@@ -499,6 +544,161 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+        {/* ── Sources Tab ── */}
+        {tab === "sources" && (
+          <div>
+            {/* Toolbar */}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+              <button onClick={() => { setShowAddForm(!showAddForm); setSourceError(""); }}
+                style={{
+                  background: showAddForm ? C.surface : C.accent + "22",
+                  color: showAddForm ? C.muted : C.accent,
+                  border: `1px solid ${showAddForm ? C.border : C.accent + "55"}`,
+                  padding: "7px 18px", borderRadius: 4, cursor: "pointer",
+                  fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace",
+                  letterSpacing: "0.08em",
+                }}>
+                {showAddForm ? "CANCEL" : "+ ADD SOURCE"}
+              </button>
+            </div>
+
+            {/* Inline add form */}
+            {showAddForm && (
+              <div style={{
+                background: C.surface, border: `1px solid ${C.accent}33`,
+                borderRadius: 8, padding: "20px 24px", marginBottom: 16,
+                display: "grid", gridTemplateColumns: "160px 1fr 180px auto", gap: 12,
+                alignItems: "end",
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.muted, fontFamily: "'DM Mono', monospace",
+                    letterSpacing: "0.1em", marginBottom: 6 }}>TYPE</div>
+                  <select value={newSource.type}
+                    onChange={e => setNewSource(s => ({ ...s, type: e.target.value, value: "" }))}
+                    style={{
+                      background: C.bg, color: C.text, border: `1px solid ${C.border}`,
+                      borderRadius: 4, padding: "8px 12px", fontSize: 13, width: "100%",
+                      fontFamily: "'Inter', sans-serif",
+                    }}>
+                    <option value="rss">RSS Feed</option>
+                    <option value="reddit">Reddit</option>
+                    <option value="x_account">X Account</option>
+                    <option value="hackernews">HackerNews</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.muted, fontFamily: "'DM Mono', monospace",
+                    letterSpacing: "0.1em", marginBottom: 6 }}>
+                    {newSource.type === "rss" ? "FEED URL"
+                     : newSource.type === "reddit" ? "SUBREDDIT"
+                     : newSource.type === "x_account" ? "X HANDLE"
+                     : "VALUE"}
+                  </div>
+                  <input value={newSource.value}
+                    onChange={e => setNewSource(s => ({ ...s, value: e.target.value }))}
+                    placeholder={
+                      newSource.type === "rss"         ? "https://example.com/feed.xml"
+                      : newSource.type === "reddit"    ? "CryptoCurrency"
+                      : newSource.type === "x_account" ? "@handle or handle"
+                      : "enabled"
+                    }
+                    style={{
+                      background: C.bg, color: C.text, border: `1px solid ${C.border}`,
+                      borderRadius: 4, padding: "8px 12px", fontSize: 13, width: "100%",
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.muted, fontFamily: "'DM Mono', monospace",
+                    letterSpacing: "0.1em", marginBottom: 6 }}>CATEGORY</div>
+                  <input value={newSource.category}
+                    onChange={e => setNewSource(s => ({ ...s, category: e.target.value }))}
+                    placeholder="e.g. DeFi, Bitcoin"
+                    style={{
+                      background: C.bg, color: C.text, border: `1px solid ${C.border}`,
+                      borderRadius: 4, padding: "8px 12px", fontSize: 13, width: "100%",
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                  />
+                </div>
+                <button onClick={addSource} style={{
+                  background: C.accent, color: C.bg, border: "none",
+                  padding: "9px 20px", borderRadius: 4, cursor: "pointer",
+                  fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace",
+                  letterSpacing: "0.08em", whiteSpace: "nowrap",
+                }}>ADD</button>
+                {sourceError && (
+                  <div style={{ gridColumn: "1 / -1", color: "#ff4455", fontSize: 12,
+                    fontFamily: "'DM Mono', monospace", marginTop: -4 }}>
+                    {sourceError}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sources list */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {sources.length === 0 && (
+                <div style={{ color: C.muted, padding: "60px 0", textAlign: "center",
+                  fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
+                  No sources configured. Add one above.
+                </div>
+              )}
+              {sources.map(src => {
+                const TYPE_COLOR = {
+                  rss:        C.accent2,
+                  reddit:     C.accent3,
+                  x_account:  "#1d9bf0",
+                  hackernews: "#ff6600",
+                };
+                const TYPE_LABEL = {
+                  rss: "RSS", reddit: "REDDIT", x_account: "X", hackernews: "HN",
+                };
+                const color = TYPE_COLOR[src.type] ?? C.muted;
+                return (
+                  <div key={src.id} style={{
+                    background: C.surface, border: `1px solid ${C.border}`,
+                    borderRadius: 6, padding: "12px 18px",
+                    display: "flex", alignItems: "center", gap: 14,
+                    opacity: src.enabled ? 1 : 0.45, transition: "opacity 0.2s",
+                  }}>
+                    {badge(TYPE_LABEL[src.type] ?? src.type, color)}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {src.type === "x_account" ? `@${src.value}` : src.value}
+                      </div>
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 12,
+                      fontFamily: "'DM Mono', monospace", minWidth: 80 }}>
+                      {src.category}
+                    </div>
+                    <button onClick={() => toggleSource(src.id, src.enabled)} style={{
+                      background: src.enabled ? C.accent + "22" : C.border,
+                      color: src.enabled ? C.accent : C.muted,
+                      border: `1px solid ${src.enabled ? C.accent + "44" : C.border}`,
+                      padding: "4px 12px", borderRadius: 4, cursor: "pointer",
+                      fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace",
+                      letterSpacing: "0.08em", transition: "all 0.15s",
+                    }}>
+                      {src.enabled ? "ON" : "OFF"}
+                    </button>
+                    <button onClick={() => deleteSource(src.id)} style={{
+                      background: "none", color: C.muted, border: "none",
+                      cursor: "pointer", fontSize: 16, lineHeight: 1,
+                      padding: "4px 6px", borderRadius: 4, transition: "color 0.15s",
+                    }}
+                      onMouseOver={e => e.currentTarget.style.color = "#ff4455"}
+                      onMouseOut={e  => e.currentTarget.style.color = C.muted}
+                    >✕</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );

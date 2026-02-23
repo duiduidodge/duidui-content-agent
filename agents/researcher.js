@@ -13,33 +13,33 @@ const claude = new OpenAI({
 });
 const rssParser = new Parser();
 
-// ─────────────────────────────────────────────────────────────
-//  SOURCE CONFIG  — edit to add/remove feeds
-// ─────────────────────────────────────────────────────────────
-const RSS_FEEDS = [
-  { url: "https://feeds.feedburner.com/TechCrunch",          category: "Tech"    },
-  { url: "https://www.wired.com/feed/rss",                   category: "Tech"    },
-  { url: "https://feeds.arstechnica.com/arstechnica/index",  category: "Tech"    },
-  { url: "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", category: "Tech" },
-  { url: "https://www.theverge.com/rss/index.xml",           category: "Tech"    },
-];
-
-const REDDIT_SUBREDDITS = [
-  "artificial", "MachineLearning", "technology",
-  "Entrepreneur", "marketing", "webdev",
-];
-
 const HN_STORIES_COUNT = 20; // top N HN stories per run
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ─────────────────────────────────────────────────────────────
+//  DYNAMIC SOURCE LOADING
+// ─────────────────────────────────────────────────────────────
+
+async function loadSources() {
+  const { data, error } = await supabase
+    .from("sources")
+    .select("*")
+    .eq("enabled", true);
+  if (error) throw new Error(`Failed to load sources: ${error.message}`);
+  console.log(`📋 Loaded ${data.length} active sources from database`);
+  return data;
+}
 
 // ─────────────────────────────────────────────────────────────
 //  FETCHERS
 // ─────────────────────────────────────────────────────────────
 
-async function fetchRSS() {
+async function fetchRSS(rssSources) {
   const items = [];
-  for (const feed of RSS_FEEDS) {
+  for (const src of rssSources) {
     try {
-      const parsed = await rssParser.parseURL(feed.url);
+      const parsed = await rssParser.parseURL(src.value);
       for (const item of parsed.items.slice(0, 10)) {
         items.push({
           source:     "rss",
@@ -47,22 +47,22 @@ async function fetchRSS() {
           title:      item.title,
           body:       item.contentSnippet || item.summary || "",
           author:     item.creator || parsed.title,
-          category:   feed.category,
+          category:   src.category,
         });
       }
-      console.log(`✅ RSS: ${feed.url} — ${Math.min(parsed.items.length, 10)} items`);
+      console.log(`✅ RSS: ${src.value} — ${Math.min(parsed.items.length, 10)} items`);
     } catch (e) {
-      console.warn(`⚠️  RSS failed for ${feed.url}: ${e.message}`);
+      console.warn(`⚠️  RSS failed for ${src.value}: ${e.message}`);
     }
   }
   return items;
 }
 
-async function fetchReddit() {
+async function fetchReddit(redditSources) {
   const items = [];
-  for (const sub of REDDIT_SUBREDDITS) {
+  for (const src of redditSources) {
     try {
-      const res  = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=10`, {
+      const res  = await fetch(`https://www.reddit.com/r/${src.value}/hot.json?limit=10`, {
         headers: { "User-Agent": "ContentAgent/1.0" },
       });
       const json = await res.json();
@@ -75,12 +75,12 @@ async function fetchReddit() {
           title:      d.title,
           body:       d.selftext?.slice(0, 1000) || d.url,
           author:     d.author,
-          category:   sub,
+          category:   src.category,
         });
       }
-      console.log(`✅ Reddit: r/${sub}`);
+      console.log(`✅ Reddit: r/${src.value}`);
     } catch (e) {
-      console.warn(`⚠️  Reddit failed for r/${sub}: ${e.message}`);
+      console.warn(`⚠️  Reddit failed for r/${src.value}: ${e.message}`);
     }
   }
   return items;
@@ -114,52 +114,54 @@ async function fetchHackerNews() {
   return items;
 }
 
-async function fetchTwitter() {
-  // Requires TWITTER_BEARER_TOKEN secret in GitHub Actions
-  const token = process.env.TWITTER_BEARER_TOKEN;
-  if (!token) {
-    console.warn("⚠️  TWITTER_BEARER_TOKEN not set — skipping Twitter fetch");
+async function fetchXAccount(handle, category) {
+  // handle is stored without @, e.g. "VitalikButerin"
+  const prompt = `You have access to X (Twitter). Retrieve the most recent posts from @${handle} from the last 6 hours that contain useful, substantive information relevant to crypto, blockchain, Web3, DeFi, or tech. Exclude retweets, replies, and trivial posts.
+
+Return a JSON array of objects. Each object must have exactly these fields:
+{
+  "title": "first 100 chars of the post text",
+  "body": "full post text",
+  "url": "https://x.com/${handle}/status/<tweet_id>"
+}
+
+Return between 0 and 6 items. If there are no relevant posts in the last 6 hours, return [].
+Return ONLY valid JSON. No markdown, no explanation.`;
+
+  try {
+    const response = await claude.chat.completions.create({
+      model:      "x-ai/grok-4.1-fast",
+      max_tokens: 1500,
+      messages:   [{ role: "user", content: prompt }],
+    });
+
+    const raw   = response.choices[0].message.content.trim();
+    const posts = JSON.parse(raw);
+    if (!Array.isArray(posts)) return [];
+
+    return posts.map(p => ({
+      source:     "twitter",
+      source_url: p.url || `https://x.com/${handle}`,
+      title:      p.title || p.body?.slice(0, 100) || "",
+      body:       p.body || "",
+      author:     handle,
+      category,
+    }));
+  } catch (e) {
+    console.warn(`⚠️  X account fetch failed for @${handle}: ${e.message}`);
     return [];
   }
+}
 
-  const SEARCH_QUERIES = [
-    "AI tools site:twitter.com -is:retweet lang:en",
-    "content marketing strategy -is:retweet lang:en",
-    "startup growth -is:retweet lang:en",
-  ];
-
+async function fetchAllXAccounts(xSources) {
   const items = [];
-  for (const q of SEARCH_QUERIES) {
-    try {
-      const url = new URL("https://api.twitter.com/2/tweets/search/recent");
-      url.searchParams.set("query", q);
-      url.searchParams.set("max_results", "10");
-      url.searchParams.set("tweet.fields", "author_id,text,created_at,public_metrics");
-      url.searchParams.set("expansions", "author_id");
-      url.searchParams.set("user.fields", "username");
-
-      const res  = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      const users = Object.fromEntries(
-        (json.includes?.users ?? []).map(u => [u.id, u.username])
-      );
-      for (const tweet of json.data ?? []) {
-        items.push({
-          source:     "twitter",
-          source_url: `https://twitter.com/i/web/status/${tweet.id}`,
-          title:      tweet.text.slice(0, 100),
-          body:       tweet.text,
-          author:     users[tweet.author_id] || "unknown",
-          category:   "Social",
-        });
-      }
-    } catch (e) {
-      console.warn(`⚠️  Twitter query failed: ${e.message}`);
-    }
+  for (let i = 0; i < xSources.length; i++) {
+    const src     = xSources[i];
+    const results = await fetchXAccount(src.value, src.category);
+    items.push(...results);
+    console.log(`✅ X/@${src.value}: ${results.length} posts`);
+    if (i < xSources.length - 1) await sleep(500);
   }
-  console.log(`✅ Twitter: ${items.length} tweets`);
   return items;
 }
 
@@ -178,9 +180,9 @@ async function enrichWithClaude(items) {
 
 For each item return:
 {
-  "category": "string (e.g. AI, Design, Marketing, Business, Dev, Science)",
+  "category": "string (e.g. Bitcoin, Ethereum, DeFi, NFT, Web3, Blockchain, Regulation, Trading)",
   "tags": ["3-5 relevant tags"],
-  "relevance_score": number (0-10, how relevant for a tech/content creator audience),
+  "relevance_score": number (0-10, how relevant for a crypto/web3 audience),
   "novelty_score": number (0-10, how fresh/novel is this topic),
   "sentiment": "positive|neutral|negative",
   "key_insights": ["2-3 bullet points summarizing key insights"]
@@ -204,11 +206,10 @@ Return ONLY a valid JSON array. No markdown, no explanation.`;
       });
       console.log(`🧠 Enriched batch ${Math.floor(i / batchSize) + 1}`);
     } catch (e) {
-      console.warn(`⚠️  Claude enrichment failed for batch: ${e.message}`);
+      console.warn(`⚠️  Enrichment failed for batch: ${e.message}`);
       batch.forEach(item => enriched.push(item)); // push unenriched
     }
 
-    // small delay to be kind to rate limits
     if (i + batchSize < items.length) await sleep(1000);
   }
   return enriched;
@@ -233,8 +234,6 @@ async function deduplicateItems(items) {
 //  MAIN
 // ─────────────────────────────────────────────────────────────
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
 async function main() {
   const startedAt = new Date();
   console.log("🚀 Agent 1: Researcher starting…");
@@ -243,18 +242,27 @@ async function main() {
   let totalInserted = 0;
 
   try {
-    // 1. Fetch from all sources in parallel
-    const [rssItems, redditItems, hnItems, twitterItems] = await Promise.all([
-      fetchRSS(),
-      fetchReddit(),
-      fetchHackerNews(),
-      fetchTwitter(),
+    // 1. Load sources from database
+    const sources = await loadSources();
+
+    // 2. Partition by type
+    const rssSources    = sources.filter(s => s.type === "rss");
+    const redditSources = sources.filter(s => s.type === "reddit");
+    const hnSource      = sources.find(s  => s.type === "hackernews" && s.value === "enabled");
+    const xSources      = sources.filter(s => s.type === "x_account");
+
+    // 3. Fetch from all source types (X accounts run sequentially internally)
+    const [rssItems, redditItems, hnItems, xItems] = await Promise.all([
+      rssSources.length    ? fetchRSS(rssSources)          : Promise.resolve([]),
+      redditSources.length ? fetchReddit(redditSources)    : Promise.resolve([]),
+      hnSource             ? fetchHackerNews()             : Promise.resolve([]),
+      xSources.length      ? fetchAllXAccounts(xSources)   : Promise.resolve([]),
     ]);
 
-    const allItems = [...rssItems, ...redditItems, ...hnItems, ...twitterItems];
+    const allItems = [...rssItems, ...redditItems, ...hnItems, ...xItems];
     console.log(`📦 Total fetched: ${allItems.length}`);
 
-    // 2. Deduplicate
+    // 4. Deduplicate
     const newItems = await deduplicateItems(allItems);
     console.log(`🔍 New items after dedup: ${newItems.length}`);
 
@@ -264,10 +272,10 @@ async function main() {
       return;
     }
 
-    // 3. Enrich with Claude
+    // 5. Enrich with Grok
     const enrichedItems = await enrichWithClaude(newItems);
 
-    // 4. Insert into Supabase
+    // 6. Insert into Supabase
     const { data, error } = await supabase
       .from("raw_content")
       .insert(

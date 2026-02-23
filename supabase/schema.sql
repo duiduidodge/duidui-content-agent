@@ -92,3 +92,42 @@ create policy "service role full access" on generated_content
 
 create policy "service role full access" on pipeline_runs
   for all using (auth.role() = 'service_role');
+
+-- ─────────────────────────────────────────────────────────────
+-- 5. SOURCES  (dashboard manages, agents read)
+-- ─────────────────────────────────────────────────────────────
+create table if not exists sources (
+  id         uuid primary key default uuid_generate_v4(),
+  type       text not null check (type in ('rss', 'reddit', 'hackernews', 'x_account')),
+  value      text not null,
+  category   text not null default '',
+  enabled    boolean not null default true,
+  created_at timestamptz default now()
+);
+
+create index if not exists sources_type_idx    on sources(type);
+create index if not exists sources_enabled_idx on sources(enabled);
+
+alter table sources enable row level security;
+
+create policy "service role full access" on sources
+  for all using (auth.role() = 'service_role');
+
+create policy "anon full access" on sources
+  for all using (true)
+  with check (true);
+
+-- Seed data
+insert into sources (type, value, category) values
+  ('rss',        'https://www.coindesk.com/arc/outboundfeeds/rss/', 'Crypto'),
+  ('rss',        'https://cointelegraph.com/rss',                   'Crypto'),
+  ('rss',        'https://decrypt.co/feed',                         'Web3'),
+  ('rss',        'https://www.theblock.co/rss.xml',                 'Blockchain'),
+  ('rss',        'https://bitcoinmagazine.com/.rss/full/',          'Bitcoin'),
+  ('reddit',     'CryptoCurrency', 'Crypto'),
+  ('reddit',     'ethereum',       'Ethereum'),
+  ('reddit',     'bitcoin',        'Bitcoin'),
+  ('reddit',     'web3',           'Web3'),
+  ('reddit',     'defi',           'DeFi'),
+  ('reddit',     'CryptoMarkets',  'Trading'),
+  ('hackernews', 'enabled',        'Tech');
