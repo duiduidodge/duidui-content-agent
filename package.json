@@ -1,0 +1,17 @@
+{
+  "name": "content-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AI-powered content research and creation pipeline",
+  "scripts": {
+    "researcher": "node agents/researcher.js",
+    "creator": "node agents/creator.js",
+    "dev:dashboard": "cd dashboard && npm run dev"
+  },
+  "dependencies": {
+    "openai": "^4.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "node-fetch": "^3.3.2",
+    "rss-parser": "^3.13.0"
+  }
+}

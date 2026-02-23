@@ -1,0 +1,6 @@
+.env
+.env.local
+node_modules/
+dashboard/node_modules/
+dashboard/.env.local
+.DS_Store
