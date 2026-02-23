@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// agents/creator.js — Agent 2: Picks high-impact content → generates Twitter threads & blog articles
+// agents/creator.js — Agent 2: Picks high-impact content → generates Thai Facebook posts
 // Triggered by GitHub Actions 1 hour after researcher runs
 
 import OpenAI from "openai";
 import { supabase, startRun, finishRun } from "../lib/supabase.js";
 
-const claude = new OpenAI({
+const client = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENROUTER_API_KEY,
 });
@@ -13,44 +13,64 @@ const claude = new OpenAI({
 // ─────────────────────────────────────────────────────────────
 //  CONFIG
 // ─────────────────────────────────────────────────────────────
-const IMPACT_THRESHOLD  = 6.5;  // combined score to qualify for generation
-const MAX_ITEMS_PER_RUN = 5;    // max pieces of content to generate per run
+const IMPACT_THRESHOLD  = 6.5;
+const MAX_ITEMS_PER_RUN = 5;
 
-// Author voice/style — customize this to match your brand
-const AUTHOR_VOICE = `
-You are writing in the voice of a tech-savvy content creator who:
-- Speaks directly and confidently, never hedging
-- Uses plain language; avoids buzzwords unless they land with irony
-- Builds arguments from first principles with concrete examples
-- Is not afraid of strong opinions but backs them with logic
-- Has a dry wit; never tries too hard to be funny
-- Writes for an audience of curious builders, marketers, and founders
-`;
+// ─────────────────────────────────────────────────────────────
+//  PROMPT
+// ─────────────────────────────────────────────────────────────
+function buildPrompt(idea) {
+  return `<role>
+Act as a Knowledgeable Friend and Expert Content Creator who excels at explaining complex concepts simply.
+</role>
+
+<task>
+Create a highly informative and engaging Facebook post written in natural, fluent Thai based on the provided <idea>.
+</task>
+
+<guidelines>
+- Tone: Friendly, sincere, and grounded. Speak like a real person having a helpful conversation, not a corporate brochure.
+- Value-Driven: Focus on being informative. The reader must walk away feeling like they learned something genuinely useful.
+- Audience: General Thai social media users browsing on their phones.
+</guidelines>
+
+<strict_constraints>
+- NO Jargon: Translate any technical terms into "everyday" Thai. If a technical term must be used, explain it immediately in simple terms.
+- NO Em-dashes: Do not use the "—" or "-" symbol as a sentence separator.
+- NO Puffery: Avoid exaggerated adjectives (e.g., "the most amazing," "revolutionary," "unbelievable," "สุดยอด"). Show, don't tell—if something is good, explain *why* using facts.
+- NO AI Filler: Output ONLY the text of the Facebook post. Do not include introductory remarks, explanations, or conclusions (e.g., do not say "Here is the post:").
+</strict_constraints>
+
+<format_requirements>
+- Hook: Start with a clear, relatable, attention-grabbing opening sentence.
+- Readability: Use short paragraphs (2-3 sentences max) tailored for mobile viewing. Absolutely no walls of text.
+- Organization: Use simple emojis (like ✅, 📌, or 💡) as bullet points to break down key facts or steps.
+- Call to Action: End with a single, friendly question to encourage comments and engagement.
+</format_requirements>
+
+<idea>
+${idea}
+</idea>`;
+}
 
 // ─────────────────────────────────────────────────────────────
 //  SCORING  — pick the best candidates
 // ─────────────────────────────────────────────────────────────
-
 async function getHighImpactContent() {
-  // Fetch unprocessed items with decent scores
   const { data, error } = await supabase
     .from("raw_content")
     .select("*")
     .eq("processed", false)
-    .gte("relevance_score", IMPACT_THRESHOLD - 2) // cast a slightly wider net
+    .gte("relevance_score", IMPACT_THRESHOLD - 2)
     .order("fetched_at", { ascending: false })
     .limit(50);
 
   if (error) throw error;
 
-  // Compute combined impact score and sort
   const scored = (data ?? [])
     .map(item => ({
       ...item,
-      impact_score: (
-        (item.relevance_score ?? 0) * 0.6 +
-        (item.novelty_score   ?? 0) * 0.4
-      ),
+      impact_score: (item.relevance_score ?? 0) * 0.6 + (item.novelty_score ?? 0) * 0.4,
     }))
     .filter(item => item.impact_score >= IMPACT_THRESHOLD)
     .sort((a, b) => b.impact_score - a.impact_score)
@@ -61,93 +81,35 @@ async function getHighImpactContent() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  TWITTER THREAD GENERATOR
+//  FACEBOOK POST GENERATOR
 // ─────────────────────────────────────────────────────────────
+async function generateFacebookPost(item) {
+  const idea = [
+    `TITLE: ${item.title}`,
+    item.body?.slice(0, 2000),
+    item.key_insights?.length
+      ? `KEY INSIGHTS:\n${item.key_insights.map(i => `- ${i}`).join("\n")}`
+      : "",
+  ].filter(Boolean).join("\n\n");
 
-async function generateThread(item) {
-  const prompt = `${AUTHOR_VOICE}
-
-Write a Twitter/X thread based on this source content. The thread should be original — don't just summarize, add YOUR perspective, analysis, and insight.
-
-SOURCE TITLE: ${item.title}
-SOURCE BODY: ${item.body?.slice(0, 1500)}
-KEY INSIGHTS: ${(item.key_insights ?? []).join("; ")}
-TAGS: ${(item.tags ?? []).join(", ")}
-
-Thread requirements:
-- 5-8 tweets
-- Tweet 1 is the hook — bold, curious, or provocative. No "🧵" cliché openers
-- Each tweet is standalone but builds on the last
-- End with a question or call to action
-- Max 280 chars per tweet
-- Include 1-2 relevant hashtags total (not one per tweet)
-
-Return as JSON:
-{
-  "title": "short internal title",
-  "hook": "the first tweet text",
-  "body": "all tweets separated by \\n---\\n",
-  "tags": ["tag1", "tag2"]
-}
-
-Return ONLY valid JSON.`;
-
-  const response = await claude.chat.completions.create({
+  const response = await client.chat.completions.create({
     model:      "x-ai/grok-4.1-fast",
-    max_tokens: 1500,
-    messages:   [{ role: "user", content: prompt }],
+    max_tokens: 2000,
+    messages:   [{ role: "user", content: buildPrompt(idea) }],
   });
 
-  return JSON.parse(response.choices[0].message.content.trim());
-}
+  const body = response.choices[0].message.content.trim();
 
-// ─────────────────────────────────────────────────────────────
-//  BLOG ARTICLE GENERATOR
-// ─────────────────────────────────────────────────────────────
-
-async function generateBlogArticle(item) {
-  const prompt = `${AUTHOR_VOICE}
-
-Write an original blog article inspired by this source. Don't just rewrite it — use it as a jumping-off point to deliver real value and a distinct point of view.
-
-SOURCE TITLE: ${item.title}
-SOURCE BODY: ${item.body?.slice(0, 1500)}
-KEY INSIGHTS: ${(item.key_insights ?? []).join("; ")}
-CATEGORY: ${item.category}
-
-Article requirements:
-- 600-900 words
-- Compelling headline (not clickbait)
-- Lead with a strong opening paragraph that hooks readers
-- Use short paragraphs (2-4 sentences max)
-- Include 2-3 subheadings
-- Concrete examples or analogies
-- Strong closing paragraph with a clear takeaway
-- Written in Markdown
-
-Return as JSON:
-{
-  "title": "the article headline",
-  "hook": "the opening paragraph only",
-  "body": "full article in Markdown",
-  "tags": ["tag1", "tag2", "tag3"]
-}
-
-Return ONLY valid JSON.`;
-
-  const response = await claude.chat.completions.create({
-    model:      "x-ai/grok-4.1-fast",
-    max_tokens: 3000,
-    messages:   [{ role: "user", content: prompt }],
-  });
-
-  return JSON.parse(response.choices[0].message.content.trim());
+  return {
+    title: body.split("\n")[0].replace(/^[✅📌💡•\-\s]+/, "").slice(0, 120),
+    hook:  body.slice(0, 280),
+    body,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
 //  MAIN
 // ─────────────────────────────────────────────────────────────
-
 async function main() {
   const startedAt = new Date();
   console.log("🚀 Agent 2: Content Creator starting…");
@@ -167,56 +129,32 @@ async function main() {
     for (const item of candidates) {
       console.log(`\n📝 Processing: "${item.title?.slice(0, 60)}…" (score: ${item.impact_score.toFixed(1)})`);
 
-      const generatedItems = [];
-
-      // Generate both formats for the highest-scoring items; threads-only for the rest
-      const generateBlog = item.impact_score >= 8.0;
-
       try {
-        // Always generate a Twitter thread
-        console.log("  → Generating Twitter thread…");
-        const thread = await generateThread(item);
-        generatedItems.push({
-          raw_content_id: item.id,
-          platform:       "twitter_thread",
-          title:          thread.title,
-          body:           thread.body,
-          hook:           thread.hook,
-          tags:           thread.tags ?? [],
-          impact_score:   item.impact_score,
-          status:         "draft",
-        });
+        console.log("  → Generating Thai Facebook post…");
+        const post = await generateFacebookPost(item);
 
-        if (generateBlog) {
-          console.log("  → Generating blog article (high score)…");
-          const article = await generateBlogArticle(item);
-          generatedItems.push({
+        const { error: insertError } = await supabase
+          .from("generated_content")
+          .insert({
             raw_content_id: item.id,
-            platform:       "blog_article",
-            title:          article.title,
-            body:           article.body,
-            hook:           article.hook,
-            tags:           article.tags ?? [],
+            platform:       "facebook_post",
+            title:          post.title,
+            body:           post.body,
+            hook:           post.hook,
+            tags:           item.tags ?? [],
             impact_score:   item.impact_score,
             status:         "draft",
           });
-        }
-
-        // Insert generated content
-        const { error: insertError } = await supabase
-          .from("generated_content")
-          .insert(generatedItems);
 
         if (insertError) throw insertError;
 
-        // Mark raw_content as processed
         await supabase
           .from("raw_content")
           .update({ processed: true })
           .eq("id", item.id);
 
-        totalCreated += generatedItems.length;
-        console.log(`  ✅ Created ${generatedItems.length} piece(s) of content`);
+        totalCreated++;
+        console.log("  ✅ Facebook post created");
 
       } catch (err) {
         console.warn(`  ⚠️  Failed for item ${item.id}: ${err.message}`);
@@ -226,24 +164,15 @@ async function main() {
           .eq("id", item.id);
       }
 
-      // Delay between items to respect rate limits
       await new Promise(r => setTimeout(r, 2000));
     }
 
-    console.log(`\n✅ Creator agent done. Generated ${totalCreated} content pieces.`);
-    await finishRun(runId, {
-      status:       "success",
-      itemsCreated: totalCreated,
-      startedAt,
-    });
+    console.log(`\n✅ Creator agent done. Generated ${totalCreated} Facebook posts.`);
+    await finishRun(runId, { status: "success", itemsCreated: totalCreated, startedAt });
 
   } catch (err) {
     console.error("❌ Creator agent failed:", err);
-    await finishRun(runId, {
-      status:       "failed",
-      errorMessage: err.message,
-      startedAt,
-    });
+    await finishRun(runId, { status: "failed", errorMessage: err.message, startedAt });
     process.exit(1);
   }
 }

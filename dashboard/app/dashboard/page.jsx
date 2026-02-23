@@ -38,6 +38,7 @@ const RssIcon      = () => <svg width="16" height="16" fill="none" stroke="curre
 const ActivityIcon = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
 const DatabaseIcon = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>;
 const SearchIcon   = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>;
+const ComposeIcon  = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
 
 // ─── helpers ─────────────────────────────────────────────────
 const badge = (label, color) => (
@@ -122,6 +123,10 @@ export default function Dashboard() {
   const [sourceError, setSourceError] = useState("");
   const [toast,       setToast]       = useState(null);
   const [rawSearch,   setRawSearch]   = useState("");
+  const [manualInput, setManualInput] = useState("");
+  const [generating,  setGenerating]  = useState(false);
+  const [manualOutput,setManualOutput]= useState("");
+  const [saving,      setSaving]      = useState(false);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -196,6 +201,47 @@ export default function Dashboard() {
     showToast("Source removed");
   };
 
+  const generateManual = async () => {
+    if (!manualInput.trim()) return;
+    setGenerating(true);
+    setManualOutput("");
+    try {
+      const res  = await fetch("/api/generate", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ content: manualInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Generation failed");
+      setManualOutput(data.text);
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const saveManualDraft = async () => {
+    if (!manualOutput) return;
+    setSaving(true);
+    const title = manualOutput.split("\n")[0].replace(/^[✅📌💡•\-\s]+/, "").slice(0, 120);
+    const { error } = await supabase.from("generated_content").insert({
+      raw_content_id: null,
+      platform:       "facebook_post",
+      title,
+      body:           manualOutput,
+      hook:           manualOutput.slice(0, 280),
+      tags:           [],
+      status:         "draft",
+    });
+    setSaving(false);
+    if (error) { showToast(error.message, "error"); return; }
+    showToast("Saved to Content Queue as draft");
+    setManualOutput("");
+    setManualInput("");
+    loadData();
+  };
+
   const addSource = async () => {
     setSourceError("");
     if (!newSource.value.trim())    { setSourceError("Value is required");    return; }
@@ -241,6 +287,7 @@ export default function Dashboard() {
     { id: "raw",     label: "Raw Feed",       icon: <RssIcon />,      count: rawItems.length },
     { id: "runs",    label: "Pipeline Runs",  icon: <ActivityIcon />, count: null },
     { id: "sources", label: "Sources",        icon: <DatabaseIcon />, count: sources.length },
+    { id: "create",  label: "Create",         icon: <ComposeIcon />,  count: null },
   ];
 
   if (loading) return (
@@ -428,13 +475,15 @@ export default function Dashboard() {
             {tab === "queue"   ? "Content Queue"
              : tab === "raw"   ? "Raw Feed"
              : tab === "runs"  ? "Pipeline Runs"
-             : "Sources"}
+             : tab === "sources" ? "Sources"
+             : "Create"}
           </h1>
           <p style={{ color: C.muted, fontSize: 13 }}>
             {tab === "queue"   ? "Review and approve AI-generated content"
              : tab === "raw"   ? "All fetched content items, scored by relevance"
              : tab === "runs"  ? "Agent execution history and status"
-             : "Manage content sources — RSS feeds, Reddit, X accounts"}
+             : tab === "sources" ? "Manage content sources — RSS feeds, Reddit, X accounts"
+             : "Paste any content and generate a Thai Facebook post"}
           </p>
         </div>
 
@@ -464,11 +513,15 @@ export default function Dashboard() {
                 >
                   <div style={{
                     width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                    background: item.platform === "twitter_thread" ? C.accent2 + "20" : C.accent3 + "20",
-                    border: `1px solid ${item.platform === "twitter_thread" ? C.accent2 + "40" : C.accent3 + "40"}`,
+                    background: item.platform === "twitter_thread" ? C.accent2 + "20"
+                      : item.platform === "facebook_post" ? "#1877f222" : C.accent3 + "20",
+                    border: `1px solid ${item.platform === "twitter_thread" ? C.accent2 + "40"
+                      : item.platform === "facebook_post" ? "#1877f244" : C.accent3 + "40"}`,
                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
                   }}>
-                    {item.platform === "twitter_thread" ? "𝕏" : "📝"}
+                    {item.platform === "twitter_thread" ? "𝕏"
+                     : item.platform === "facebook_post" ? "f"
+                     : "📝"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6,
@@ -477,7 +530,9 @@ export default function Dashboard() {
                       {item.title || item.hook?.slice(0, 80)}
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      {badge(item.platform === "twitter_thread" ? "Thread" : "Blog", C.accent2)}
+                      {badge(item.platform === "twitter_thread" ? "Thread"
+                        : item.platform === "facebook_post" ? "Facebook"
+                        : "Blog", C.accent2)}
                       {badge(item.status, STATUS_COLOR[item.status])}
                       <span style={{ color: C.muted, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>
                         {item.raw_content?.source && SOURCE_ICON[item.raw_content.source]}
@@ -866,6 +921,98 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+        {/* ── Create (Manual) ── */}
+        {tab === "create" && (
+          <div style={{ maxWidth: 800 }}>
+
+            {/* Input */}
+            <div style={{ marginBottom: 16 }}>
+              <label htmlFor="manual-input" style={{ display: "block", fontSize: 11,
+                color: C.muted, fontFamily: "'DM Mono', monospace",
+                letterSpacing: "0.1em", marginBottom: 8 }}>
+                SOURCE CONTENT
+              </label>
+              <textarea
+                id="manual-input"
+                value={manualInput}
+                onChange={e => setManualInput(e.target.value)}
+                placeholder="Paste an article, tweet thread, news item, or any content here. Grok will turn it into a Thai Facebook post using your prompt."
+                rows={10}
+                style={{
+                  width: "100%", background: C.glass,
+                  border: `1px solid ${C.border}`, borderRadius: 12,
+                  color: C.text, padding: "16px", fontSize: 13,
+                  fontFamily: "'Inter', sans-serif", lineHeight: 1.7,
+                  resize: "vertical", transition: "border-color 0.15s",
+                }}
+              />
+            </div>
+
+            <button
+              onClick={generateManual}
+              disabled={generating || !manualInput.trim()}
+              style={{
+                background: generating || !manualInput.trim()
+                  ? C.glass2 : C.accent,
+                color: generating || !manualInput.trim() ? C.muted : C.bg,
+                border: "none", padding: "11px 28px", borderRadius: 8,
+                cursor: generating || !manualInput.trim() ? "not-allowed" : "pointer",
+                fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace",
+                letterSpacing: "0.08em", transition: "all 0.15s",
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+              {generating
+                ? <><span style={{ animation: "pulse 1s infinite", display: "inline-block" }}>⏳</span> Generating…</>
+                : "✦ Generate Facebook Post"}
+            </button>
+
+            {/* Output */}
+            {manualOutput && (
+              <div style={{ marginTop: 24, animation: "fadeIn 0.3s ease" }}>
+                <div style={{ display: "flex", justifyContent: "space-between",
+                  alignItems: "center", marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, color: C.muted,
+                    fontFamily: "'DM Mono', monospace", letterSpacing: "0.1em" }}>
+                    GENERATED POST
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(manualOutput); showToast("Copied to clipboard"); }}
+                      style={{
+                        background: C.glass2, color: C.muted,
+                        border: `1px solid ${C.border}`, padding: "6px 14px",
+                        borderRadius: 8, cursor: "pointer", fontSize: 12,
+                        fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em",
+                      }}>
+                      Copy
+                    </button>
+                    <button
+                      onClick={saveManualDraft}
+                      disabled={saving}
+                      style={{
+                        background: saving ? C.glass2 : C.accent + "18",
+                        color: saving ? C.muted : C.accent,
+                        border: `1px solid ${saving ? C.border : C.accent + "44"}`,
+                        padding: "6px 14px", borderRadius: 8, cursor: saving ? "not-allowed" : "pointer",
+                        fontSize: 12, fontFamily: "'DM Mono', monospace",
+                        letterSpacing: "0.06em", fontWeight: 700,
+                      }}>
+                      {saving ? "Saving…" : "Save as Draft"}
+                    </button>
+                  </div>
+                </div>
+                <div style={{
+                  ...glass, borderRadius: 12, padding: "24px",
+                  fontSize: 15, lineHeight: 1.9, color: C.text,
+                  whiteSpace: "pre-wrap", fontFamily: "'Inter', sans-serif",
+                }}>
+                  {manualOutput}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       {/* ── Toast ── */}
       {toast && (
