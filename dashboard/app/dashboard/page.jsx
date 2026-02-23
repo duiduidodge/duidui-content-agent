@@ -39,6 +39,7 @@ const ActivityIcon = () => <svg width="16" height="16" fill="none" stroke="curre
 const DatabaseIcon = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>;
 const SearchIcon   = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>;
 const ComposeIcon  = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+const StarIcon     = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
 
 // ─── helpers ─────────────────────────────────────────────────
 const badge = (label, color) => (
@@ -395,6 +396,13 @@ export default function Dashboard() {
     !rawSearch || i.title?.toLowerCase().includes(rawSearch.toLowerCase())
   );
 
+  const PICKS_THRESHOLD = 8.0;
+  const topPickItems = rawItems
+    .filter(i => !i.processed)
+    .map(i => ({ ...i, impact_score: (i.relevance_score ?? 0) * 0.6 + (i.novelty_score ?? 0) * 0.4 }))
+    .filter(i => i.impact_score >= PICKS_THRESHOLD)
+    .sort((a, b) => b.impact_score - a.impact_score);
+
   const API_SOURCES = [
     {
       id:          "bidclub",
@@ -409,6 +417,7 @@ export default function Dashboard() {
 
   const NAV_ITEMS = [
     { id: "queue",   label: "Content Queue", icon: <LayersIcon />,   count: stats?.drafts },
+    { id: "picks",   label: "Top Picks",      icon: <StarIcon />,     count: topPickItems.length },
     { id: "raw",     label: "Raw Feed",       icon: <RssIcon />,      count: rawItems.length },
     { id: "runs",    label: "Pipeline Runs",  icon: <ActivityIcon />, count: null },
     { id: "sources", label: "Sources",        icon: <DatabaseIcon />, count: sources.length },
@@ -599,6 +608,7 @@ export default function Dashboard() {
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800,
             color: C.text, marginBottom: 4 }}>
             {tab === "queue"   ? "Content Queue"
+             : tab === "picks"  ? "Top Picks"
              : tab === "raw"   ? "Raw Feed"
              : tab === "runs"  ? "Pipeline Runs"
              : tab === "sources" ? "Sources"
@@ -606,6 +616,7 @@ export default function Dashboard() {
           </h1>
           <p style={{ color: C.muted, fontSize: 13 }}>
             {tab === "queue"   ? "Review and approve AI-generated content"
+             : tab === "picks"  ? `High-scoring content ready for generation — impact ≥ ${PICKS_THRESHOLD}`
              : tab === "raw"   ? "All fetched content items, scored by relevance"
              : tab === "runs"  ? "Agent execution history and status"
              : tab === "sources" ? "Manage content sources — RSS feeds, Reddit, X accounts"
@@ -783,6 +794,74 @@ export default function Dashboard() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Top Picks ── */}
+        {tab === "picks" && (
+          <div>
+            {topPickItems.length === 0 && (
+              <EmptyState icon="⭐" title="No top picks yet"
+                message={`Items scoring ${PICKS_THRESHOLD}+ impact will appear here after the researcher runs.`} />
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {topPickItems.map(item => (
+                <div key={item.id} className="glass-row" style={{
+                  ...glass, borderRadius: 12, padding: "14px 20px",
+                  display: "flex", alignItems: "center", gap: 14,
+                  borderColor: item.impact_score >= 9 ? C.accent + "33" : C.border,
+                }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{SOURCE_ICON[item.source] ?? "🌐"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <a href={item.source_url} target="_blank" rel="noopener noreferrer"
+                        style={{ color: C.text, textDecoration: "none" }}
+                        onClick={e => e.stopPropagation()}>{item.title}</a>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      {item.category && badge(item.category, C.accent2)}
+                      {item.sentiment && badge(item.sentiment,
+                        item.sentiment === "positive" ? C.success :
+                        item.sentiment === "negative" ? C.error : C.muted)}
+                      <span style={{ color: C.muted, fontSize: 11,
+                        fontFamily: "'DM Mono', monospace" }}>
+                        {formatDistanceToNow(new Date(item.fetched_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 16, alignItems: "center", flexShrink: 0 }}>
+                    <div style={{ textAlign: "center", minWidth: 36 }}>
+                      <div style={{ fontSize: 20, fontWeight: 800, fontFamily: "'Syne', sans-serif",
+                        color: C.accent }}>
+                        {item.impact_score.toFixed(1)}
+                      </div>
+                      <div style={{ fontSize: 9, color: C.muted, letterSpacing: "0.06em" }}>IMPACT</div>
+                    </div>
+                    {badge(item.source === "bidclub" ? "Thesis" : "News",
+                      item.source === "bidclub" ? "#f59e0b" : C.accent2)}
+                    <button
+                      onClick={e => { e.stopPropagation(); generateFromRawItem(item); }}
+                      disabled={generatingId === item.id}
+                      aria-label={`Generate post from: ${item.title}`}
+                      style={{
+                        background: generatingId === item.id ? C.glass2 : C.accent + "18",
+                        color:      generatingId === item.id ? C.muted : C.accent,
+                        border:     `1px solid ${generatingId === item.id ? C.border : C.accent + "44"}`,
+                        padding: "5px 14px", borderRadius: 8,
+                        cursor: generatingId === item.id ? "not-allowed" : "pointer",
+                        fontSize: 11, fontWeight: 700,
+                        fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em",
+                        whiteSpace: "nowrap", transition: "all 0.15s",
+                      }}>
+                      {generatingId === item.id
+                        ? <span style={{ animation: "pulse 1s infinite", display: "inline-block" }}>⏳</span>
+                        : "✦ Generate"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
