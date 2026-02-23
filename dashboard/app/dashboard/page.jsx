@@ -140,7 +140,7 @@ export default function Dashboard() {
   const loadData = useCallback(async () => {
     const [rawRes, genRes, runsRes] = await Promise.all([
       supabase.from("raw_content").select("*").order("fetched_at", { ascending: false }).limit(100),
-      supabase.from("generated_content").select("*, raw_content(title, source)").order("created_at", { ascending: false }).limit(50),
+      supabase.from("generated_content").select("*, raw_content(title, source, source_url)").order("created_at", { ascending: false }).limit(50),
       supabase.from("pipeline_runs").select("*").order("started_at", { ascending: false }).limit(30),
     ]);
 
@@ -276,7 +276,7 @@ export default function Dashboard() {
     setSaving(false);
     if (error) { showToast(error.message, "error"); return; }
     try {
-      await fetch("/api/telegram", {
+      const tgRes = await fetch("/api/telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -285,7 +285,13 @@ export default function Dashboard() {
           sourceUrl: "",
         }),
       });
-    } catch {}
+      if (!tgRes.ok) {
+        const tgData = await tgRes.json().catch(() => ({}));
+        showToast(`Saved, but Telegram failed: ${tgData.error || tgRes.statusText}`, "error");
+      }
+    } catch (err) {
+      showToast(`Saved, but Telegram failed: ${err.message}`, "error");
+    }
     showToast("Saved to Content Queue as draft");
     setManualOutput("");
     setManualInput("");
@@ -324,7 +330,7 @@ export default function Dashboard() {
       if (insertErr) throw insertErr;
       await supabase.from("raw_content").update({ processed: true }).eq("id", item.id);
       try {
-        await fetch("/api/telegram", {
+        const tgRes = await fetch("/api/telegram", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -333,7 +339,13 @@ export default function Dashboard() {
             sourceUrl: item.source_url ?? "",
           }),
         });
-      } catch {}
+        if (!tgRes.ok) {
+          const tgData = await tgRes.json().catch(() => ({}));
+          showToast(`Saved, but Telegram failed: ${tgData.error || tgRes.statusText}`, "error");
+        }
+      } catch (err) {
+        showToast(`Saved, but Telegram failed: ${err.message}`, "error");
+      }
       showToast("Post saved to Content Queue");
       loadData();
     } catch (err) {
@@ -719,6 +731,23 @@ export default function Dashboard() {
                 {selected.title && (
                   <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 16,
                     lineHeight: 1.4, color: C.text }}>{selected.title}</div>
+                )}
+
+                {selected.raw_content?.source_url && (
+                  <a
+                    href={selected.raw_content.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-block",
+                      color: C.accent,
+                      fontSize: 12,
+                      marginBottom: 16,
+                      textDecoration: "none",
+                    }}
+                  >
+                    Open source article →
+                  </a>
                 )}
 
                 {(selected.tags ?? []).length > 0 && (

@@ -103,6 +103,16 @@ create policy "anon read generated_content" on generated_content
 create policy "anon read pipeline_runs" on pipeline_runs
   for select using (true);
 
+-- Dashboard writes with anon key
+create policy "anon insert generated_content" on generated_content
+  for insert with check (true);
+
+create policy "anon update generated_content" on generated_content
+  for update using (true) with check (true);
+
+create policy "anon update raw_content" on raw_content
+  for update using (true) with check (true);
+
 -- ─────────────────────────────────────────────────────────────
 -- 5. SOURCES  (dashboard manages, agents read)
 -- ─────────────────────────────────────────────────────────────

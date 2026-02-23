@@ -23,6 +23,7 @@ Create an informative Facebook post in natural, fluent Thai that breaks down the
 - NO Em-dashes: Do not use the "—" or "-" symbol as a sentence separator.
 - NO Hype: No "moon," "gem," "สุดยอด." Present facts and let the reader decide.
 - NO AI Filler: Output ONLY the Facebook post text.
+- Depth Requirement: Write at least 900 Thai characters with concrete details.
 </strict_constraints>
 
 <format_requirements>
@@ -34,6 +35,7 @@ Structure the post in this exact order:
 5. Catalysts: Use 📌 bullets for 2-3 upcoming events that could move the price
 6. Risk: One honest sentence naming the main downside risk
 7. CTA: A friendly question asking readers their view on this asset
+8. Length: At least 7 short paragraphs total, and each ✅/📌 bullet must include a specific fact or number.
 </format_requirements>
 
 <idea>
@@ -59,12 +61,14 @@ Create a highly informative and engaging Facebook post written in natural, fluen
 - NO Em-dashes: Do not use the "—" or "-" symbol as a sentence separator.
 - NO Puffery: Avoid exaggerated adjectives (e.g., "the most amazing," "revolutionary," "unbelievable," "สุดยอด"). Show, don't tell—if something is good, explain *why* using facts.
 - NO AI Filler: Output ONLY the text of the Facebook post. Do not include introductory remarks, explanations, or conclusions (e.g., do not say "Here is the post:").
+- Depth Requirement: Write at least 700 Thai characters with practical context and concrete details.
 </strict_constraints>
 
 <format_requirements>
 - Hook: Start with a clear, relatable, attention-grabbing opening sentence.
 - Readability: Use short paragraphs (2-3 sentences max) tailored for mobile viewing. Absolutely no walls of text.
-- Organization: Use simple emojis (like ✅, 📌, or 💡) as bullet points to break down key facts or steps.
+- Organization: Use simple emojis (like ✅, 📌, or 💡) as bullet points to break down key facts or steps. Include at least 5 bullets in total.
+- Substance: Include at least one mini-explanation section ("ทำไมเรื่องนี้สำคัญ") and one risk section ("ต้องระวังอะไร").
 - Call to Action: End with a single, friendly question to encourage comments and engagement.
 </format_requirements>
 
@@ -93,7 +97,7 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model:      "openai/gpt-5-mini",
-        max_tokens: type === "thesis" ? 2500 : 2000,
+        max_tokens: type === "thesis" ? 3000 : 2400,
         messages:   [{ role: "user", content: type === "thesis"
           ? THESIS_PROMPT_TEMPLATE(content.trim())
           : PROMPT_TEMPLATE(content.trim()) }],
