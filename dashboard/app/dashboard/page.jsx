@@ -562,6 +562,15 @@ export default function Dashboard() {
           .queue-row-actions { width: 100%; border-top: 1px solid ${C.border};
             padding-top: 10px; display: flex; gap: 8px; }
           .stats-grid > *:last-child:nth-child(odd) { grid-column: 1 / -1; }
+          .main-content {
+            margin-left: 240px; padding: 40px 48px;
+            min-height: 100vh; max-width: calc(100vw - 240px); flex: 1;
+          }
+          @media (max-width: 767px) {
+            .main-content { margin-left: 0 !important; padding: 72px 16px 80px !important; max-width: 100vw !important; }
+            .stats-grid { gap: 10px !important; margin-bottom: 20px !important; }
+            .section-header { margin-bottom: 12px !important; margin-top: 4px !important; }
+          }
         }
       `}</style>
 
@@ -692,17 +701,11 @@ export default function Dashboard() {
       </nav>
 
       {/* ── Main content ── */}
-      <main style={{
-        marginLeft: isMobile ? 0 : 240,
-        flex: 1,
-        padding: isMobile ? "72px 16px 80px" : "40px 48px",
-        minHeight: "100vh",
-        maxWidth: isMobile ? "100vw" : "calc(100vw - 240px)",
-      }}>
+      <main className="main-content">
 
         {/* Stats row */}
         <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)",
-          gap: isMobile ? 10 : 16, marginBottom: isMobile ? 20 : 32 }}>
+          gap: 16, marginBottom: 32 }}>
           <StatCard label="Raw Items"  value={stats?.totalRaw}  accent={C.accent2} sub="fetched total"     compact={isMobile} />
           <StatCard label="Generated"  value={stats?.totalGen}  accent={C.accent}  sub="content pieces"  compact={isMobile} />
           <StatCard label="In Draft"   value={stats?.drafts}    accent={C.muted}   sub="awaiting review" compact={isMobile} />
@@ -759,7 +762,7 @@ export default function Dashboard() {
         </div>
 
         {/* Section header */}
-        <div className="section-header" style={{ marginBottom: isMobile ? 12 : 20, marginTop: isMobile ? 8 : 0 }}>
+        <div className="section-header" style={{ marginBottom: 20 }}>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800,
             color: C.text, marginBottom: 4 }}>
             {tab === "queue"   ? "Content Queue"
