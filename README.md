@@ -39,6 +39,8 @@ Add these **GitHub Actions Secrets** (Settings → Secrets → Actions):
 | `ANTHROPIC_API_KEY` | Your Claude API key |
 | `SUPABASE_URL` | `https://xxxx.supabase.co` |
 | `SUPABASE_SERVICE_KEY` | Supabase `service_role` key |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token for notifications |
+| `TELEGRAM_CHAT_ID` | Telegram target chat ID (group/channel/user) |
 | `TWITTER_BEARER_TOKEN` | Twitter API v2 bearer token (optional) |
 
 ### 3. Dashboard Setup
@@ -147,6 +149,8 @@ content-agent/
 | `ANTHROPIC_API_KEY` | Agents | Claude API |
 | `SUPABASE_URL` | Agents | Supabase project URL |
 | `SUPABASE_SERVICE_KEY` | Agents | Bypasses RLS — server only |
+| `TELEGRAM_BOT_TOKEN` | Agents + Dashboard API | Telegram bot token for generated-content alerts |
+| `TELEGRAM_CHAT_ID` | Agents + Dashboard API | Telegram destination chat ID |
 | `TWITTER_BEARER_TOKEN` | Agent 1 | Twitter API v2 |
 | `NEXT_PUBLIC_SUPABASE_URL` | Dashboard | Supabase URL (public) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Dashboard | Anon key (public) |

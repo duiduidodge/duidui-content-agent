@@ -275,6 +275,17 @@ export default function Dashboard() {
     });
     setSaving(false);
     if (error) { showToast(error.message, "error"); return; }
+    try {
+      await fetch("/api/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          body: manualOutput,
+          sourceUrl: "",
+        }),
+      });
+    } catch {}
     showToast("Saved to Content Queue as draft");
     setManualOutput("");
     setManualInput("");
@@ -312,6 +323,17 @@ export default function Dashboard() {
       });
       if (insertErr) throw insertErr;
       await supabase.from("raw_content").update({ processed: true }).eq("id", item.id);
+      try {
+        await fetch("/api/telegram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            body: data.text,
+            sourceUrl: item.source_url ?? "",
+          }),
+        });
+      } catch {}
       showToast("Post saved to Content Queue");
       loadData();
     } catch (err) {

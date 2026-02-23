@@ -16,6 +16,46 @@ const client = new OpenAI({
 const IMPACT_THRESHOLD  = 6.5;
 const MAX_ITEMS_PER_RUN = 5;
 
+function escapeHtml(text = "") {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+async function sendTelegramMessage({ title, body, sourceUrl }) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) return { skipped: true };
+
+  const lines = [
+    "🆕 <b>New Generated Content</b>",
+    title ? `\n<b>${escapeHtml(title)}</b>` : "",
+    body ? `\n\n${escapeHtml(body)}` : "",
+    sourceUrl ? `\n\n🔗 ${escapeHtml(sourceUrl)}` : "",
+  ];
+
+  const text = lines.join("").slice(0, 4000);
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: false,
+    }),
+  });
+
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(`Telegram send failed: ${res.status} ${msg}`);
+  }
+
+  return { skipped: false };
+}
+
 // ─────────────────────────────────────────────────────────────
 //  PROMPTS
 // ─────────────────────────────────────────────────────────────
@@ -193,6 +233,16 @@ async function main() {
           .from("raw_content")
           .update({ processed: true })
           .eq("id", item.id);
+
+        try {
+          await sendTelegramMessage({
+            title: post.title,
+            body: post.body,
+            sourceUrl: item.source_url,
+          });
+        } catch (telegramErr) {
+          console.warn(`  ⚠️  Telegram notification failed: ${telegramErr.message}`);
+        }
 
         totalCreated++;
         console.log("  ✅ Facebook post created");
