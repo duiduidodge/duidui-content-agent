@@ -17,8 +17,47 @@ const IMPACT_THRESHOLD  = 6.5;
 const MAX_ITEMS_PER_RUN = 5;
 
 // ─────────────────────────────────────────────────────────────
-//  PROMPT
+//  PROMPTS
 // ─────────────────────────────────────────────────────────────
+function buildThesisPrompt(idea) {
+  return `<role>
+Act as a Thai financial educator who explains investment theses clearly to everyday investors.
+</role>
+
+<task>
+Create an informative Facebook post in natural, fluent Thai that breaks down the investment thesis from the provided <idea>. Help Thai readers understand what the asset is, why it might be mispriced, and what to watch for.
+</task>
+
+<guidelines>
+- Tone: Like a knowledgeable friend explaining an investment idea over coffee. Honest and grounded, not a salesperson.
+- Value-Driven: Preserve the key numbers and arguments. Do not water down the data.
+- Audience: Thai investors and crypto enthusiasts who understand basic financial concepts but are not professional analysts.
+- Balance: Present the opportunity AND the main risk. Never one-sided.
+</guidelines>
+
+<strict_constraints>
+- NO Jargon without explanation: Terms like FDV, DEX, AMM must be explained immediately in simple Thai.
+- NO Em-dashes: Do not use the "—" or "-" symbol as a sentence separator.
+- NO Hype: No "moon," "gem," "สุดยอด." Present facts and let the reader decide.
+- NO AI Filler: Output ONLY the Facebook post text.
+</strict_constraints>
+
+<format_requirements>
+Structure the post in this exact order:
+1. Hook: Name the asset and one striking fact (the most compelling number or gap)
+2. What is it: 2-3 sentences explaining what the project does in plain Thai
+3. The Thesis: Use ✅ bullets for the 3-4 strongest arguments with their supporting numbers
+4. Valuation: One short paragraph comparing current valuation to peers in plain numbers
+5. Catalysts: Use 📌 bullets for 2-3 upcoming events that could move the price
+6. Risk: One honest sentence naming the main downside risk
+7. CTA: A friendly question asking readers their view on this asset
+</format_requirements>
+
+<idea>
+${idea}
+</idea>`;
+}
+
 function buildPrompt(idea) {
   return `<role>
 Act as a Knowledgeable Friend and Expert Content Creator who excels at explaining complex concepts simply.
@@ -92,10 +131,11 @@ async function generateFacebookPost(item) {
       : "",
   ].filter(Boolean).join("\n\n");
 
+  const isThesis = item.source === "bidclub";
   const response = await client.chat.completions.create({
     model:      "x-ai/grok-4.1-fast",
-    max_tokens: 2000,
-    messages:   [{ role: "user", content: buildPrompt(idea) }],
+    max_tokens: isThesis ? 2500 : 2000,
+    messages:   [{ role: "user", content: isThesis ? buildThesisPrompt(idea) : buildPrompt(idea) }],
   });
 
   const body = response.choices[0].message.content.trim();
@@ -130,7 +170,8 @@ async function main() {
       console.log(`\n📝 Processing: "${item.title?.slice(0, 60)}…" (score: ${item.impact_score.toFixed(1)})`);
 
       try {
-        console.log("  → Generating Thai Facebook post…");
+        const postType = item.source === "bidclub" ? "thesis" : "news";
+        console.log(`  → Generating ${postType} post…`);
         const post = await generateFacebookPost(item);
 
         const { error: insertError } = await supabase

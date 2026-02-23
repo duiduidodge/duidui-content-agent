@@ -165,6 +165,37 @@ async function fetchAllXAccounts(xSources) {
   return items;
 }
 
+async function fetchBidClub() {
+  try {
+    const res = await fetch("https://bidclub.ai/api/v1/posts?sort=new&limit=50", {
+      headers: {
+        "Authorization": `Bearer ${process.env.BIDCLUB_API_KEY}`,
+        "User-Agent":    "ContentAgent/1.0",
+      },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json  = await res.json();
+    const allPosts = json.posts ?? [];
+
+    // Keep only posts from the last 6 hours
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+    const posts  = allPosts.filter(p => new Date(p.created_at).getTime() >= cutoff);
+
+    console.log(`✅ BidClub: ${posts.length} new posts (of ${allPosts.length} fetched)`);
+    return posts.map(p => ({
+      source:     "bidclub",
+      source_url: p.url,
+      title:      p.title ?? "",
+      body:       "",   // list endpoint has no body; title + Grok enrichment covers it
+      author:     p.author?.username ?? "bidclub",
+      category:   p.category?.slug ?? "investment",
+    }));
+  } catch (e) {
+    console.warn(`⚠️  BidClub fetch failed: ${e.message}`);
+    return [];
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 //  CLAUDE ENRICHMENT
 // ─────────────────────────────────────────────────────────────
@@ -252,14 +283,15 @@ async function main() {
     const xSources      = sources.filter(s => s.type === "x_account");
 
     // 3. Fetch from all source types (X accounts run sequentially internally)
-    const [rssItems, redditItems, hnItems, xItems] = await Promise.all([
+    const [rssItems, redditItems, hnItems, xItems, bidclubItems] = await Promise.all([
       rssSources.length    ? fetchRSS(rssSources)          : Promise.resolve([]),
       redditSources.length ? fetchReddit(redditSources)    : Promise.resolve([]),
       hnSource             ? fetchHackerNews()             : Promise.resolve([]),
       xSources.length      ? fetchAllXAccounts(xSources)   : Promise.resolve([]),
+      fetchBidClub(),
     ]);
 
-    const allItems = [...rssItems, ...redditItems, ...hnItems, ...xItems];
+    const allItems = [...rssItems, ...redditItems, ...hnItems, ...xItems, ...bidclubItems];
     console.log(`📦 Total fetched: ${allItems.length}`);
 
     // 4. Deduplicate

@@ -3,6 +3,43 @@
 
 import { NextResponse } from "next/server";
 
+const THESIS_PROMPT_TEMPLATE = (idea) => `<role>
+Act as a Thai financial educator who explains investment theses clearly to everyday investors.
+</role>
+
+<task>
+Create an informative Facebook post in natural, fluent Thai that breaks down the investment thesis from the provided <idea>. Help Thai readers understand what the asset is, why it might be mispriced, and what to watch for.
+</task>
+
+<guidelines>
+- Tone: Like a knowledgeable friend explaining an investment idea over coffee. Honest and grounded, not a salesperson.
+- Value-Driven: Preserve the key numbers and arguments. Do not water down the data.
+- Audience: Thai investors and crypto enthusiasts who understand basic financial concepts but are not professional analysts.
+- Balance: Present the opportunity AND the main risk. Never one-sided.
+</guidelines>
+
+<strict_constraints>
+- NO Jargon without explanation: Terms like FDV, DEX, AMM must be explained immediately in simple Thai.
+- NO Em-dashes: Do not use the "—" or "-" symbol as a sentence separator.
+- NO Hype: No "moon," "gem," "สุดยอด." Present facts and let the reader decide.
+- NO AI Filler: Output ONLY the Facebook post text.
+</strict_constraints>
+
+<format_requirements>
+Structure the post in this exact order:
+1. Hook: Name the asset and one striking fact (the most compelling number or gap)
+2. What is it: 2-3 sentences explaining what the project does in plain Thai
+3. The Thesis: Use ✅ bullets for the 3-4 strongest arguments with their supporting numbers
+4. Valuation: One short paragraph comparing current valuation to peers in plain numbers
+5. Catalysts: Use 📌 bullets for 2-3 upcoming events that could move the price
+6. Risk: One honest sentence naming the main downside risk
+7. CTA: A friendly question asking readers their view on this asset
+</format_requirements>
+
+<idea>
+${idea}
+</idea>`;
+
 const PROMPT_TEMPLATE = (idea) => `<role>
 Act as a Knowledgeable Friend and Expert Content Creator who excels at explaining complex concepts simply.
 </role>
@@ -37,7 +74,7 @@ ${idea}
 
 export async function POST(request) {
   try {
-    const { content } = await request.json();
+    const { content, type = "news" } = await request.json();
 
     if (!content?.trim()) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -56,8 +93,10 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model:      "x-ai/grok-4.1-fast",
-        max_tokens: 2000,
-        messages:   [{ role: "user", content: PROMPT_TEMPLATE(content.trim()) }],
+        max_tokens: type === "thesis" ? 2500 : 2000,
+        messages:   [{ role: "user", content: type === "thesis"
+          ? THESIS_PROMPT_TEMPLATE(content.trim())
+          : PROMPT_TEMPLATE(content.trim()) }],
       }),
     });
 

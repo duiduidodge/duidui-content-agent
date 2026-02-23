@@ -50,7 +50,7 @@ const badge = (label, color) => (
 );
 
 const STATUS_COLOR = { draft: C.muted, approved: C.accent, published: C.success, rejected: C.error };
-const SOURCE_ICON  = { rss: "📡", reddit: "🟠", hackernews: "🔶", twitter: "𝕏" };
+const SOURCE_ICON  = { rss: "📡", reddit: "🟠", hackernews: "🔶", twitter: "𝕏", bidclub: "💼" };
 
 // ─── empty state ─────────────────────────────────────────────
 function EmptyState({ icon, title, message }) {
@@ -127,6 +127,10 @@ export default function Dashboard() {
   const [generating,  setGenerating]  = useState(false);
   const [manualOutput,setManualOutput]= useState("");
   const [saving,      setSaving]      = useState(false);
+  const [contentType, setContentType] = useState("news");
+  const [genHistory,  setGenHistory]  = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [generatingId, setGeneratingId] = useState(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -186,6 +190,24 @@ export default function Dashboard() {
     return () => supabase.removeChannel(ch);
   }, [loadSources]);
 
+  const loadHistory = useCallback(async () => {
+    const { data } = await supabase
+      .from("create_history")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setGenHistory(data ?? []);
+  }, []);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  useEffect(() => {
+    const ch = supabase.channel("history-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "create_history" }, loadHistory)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [loadHistory]);
+
   const updateStatus = async (id, status) => {
     await supabase.from("generated_content").update({ status }).eq("id", id);
     showToast(`Content ${status}`);
@@ -201,6 +223,17 @@ export default function Dashboard() {
     showToast("Source removed");
   };
 
+  const saveToHistory = async (input, output) => {
+    await supabase.from("create_history").insert({
+      input_snippet: input.slice(0, 200),
+      output,
+    });
+  };
+
+  const deleteHistoryEntry = async (id) => {
+    await supabase.from("create_history").delete().eq("id", id);
+  };
+
   const generateManual = async () => {
     if (!manualInput.trim()) return;
     setGenerating(true);
@@ -209,11 +242,12 @@ export default function Dashboard() {
       const res  = await fetch("/api/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ content: manualInput }),
+        body:    JSON.stringify({ content: manualInput, type: contentType }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
       setManualOutput(data.text);
+      saveToHistory(manualInput.trim(), data.text);
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -240,6 +274,46 @@ export default function Dashboard() {
     setManualOutput("");
     setManualInput("");
     loadData();
+  };
+
+  const generateFromRawItem = async (item) => {
+    setGeneratingId(item.id);
+    const idea = [
+      `TITLE: ${item.title}`,
+      item.body?.slice(0, 2000),
+      item.key_insights?.length
+        ? `KEY INSIGHTS:\n${item.key_insights.map(i => `- ${i}`).join("\n")}`
+        : "",
+    ].filter(Boolean).join("\n\n");
+    const type = item.source === "bidclub" ? "thesis" : "news";
+    try {
+      const res = await fetch("/api/generate", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ content: idea, type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Generation failed");
+      const title = data.text.split("\n")[0].replace(/^[✅📌💡•\-\s]+/, "").slice(0, 120);
+      const { error: insertErr } = await supabase.from("generated_content").insert({
+        raw_content_id: item.id,
+        platform:       "facebook_post",
+        title,
+        body:           data.text,
+        hook:           data.text.slice(0, 280),
+        tags:           item.tags ?? [],
+        impact_score:   item.impact_score ?? null,
+        status:         "draft",
+      });
+      if (insertErr) throw insertErr;
+      await supabase.from("raw_content").update({ processed: true }).eq("id", item.id);
+      showToast("Post saved to Content Queue");
+      loadData();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setGeneratingId(null);
+    }
   };
 
   const addSource = async () => {
@@ -282,6 +356,18 @@ export default function Dashboard() {
     !rawSearch || i.title?.toLowerCase().includes(rawSearch.toLowerCase())
   );
 
+  const API_SOURCES = [
+    {
+      id:          "bidclub",
+      label:       "BidClub",
+      description: "Investment pitches & discussions",
+      endpoint:    "bidclub.ai/api/v1/posts?sort=new",
+      category:    "Investment",
+      color:       "#f59e0b",
+      docsUrl:     "https://bidclub.ai/readme#for-agents",
+    },
+  ];
+
   const NAV_ITEMS = [
     { id: "queue",   label: "Content Queue", icon: <LayersIcon />,   count: stats?.drafts },
     { id: "raw",     label: "Raw Feed",       icon: <RssIcon />,      count: rawItems.length },
@@ -315,6 +401,7 @@ export default function Dashboard() {
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes slideIn { from{transform:translateX(100%)} to{transform:translateX(0)} }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
@@ -697,7 +784,7 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 20, alignItems: "center", flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: 16, alignItems: "center", flexShrink: 0 }}>
                     <div style={{ textAlign: "center", minWidth: 32 }}>
                       <div style={{ fontSize: 17, fontWeight: 800, fontFamily: "'Syne', sans-serif",
                         color: (item.relevance_score ?? 0) >= 7 ? C.accent : C.muted }}>
@@ -712,7 +799,29 @@ export default function Dashboard() {
                       </div>
                       <div style={{ fontSize: 9, color: C.muted, letterSpacing: "0.06em" }}>NOV</div>
                     </div>
-                    {item.processed ? badge("Done", C.success) : badge("Pending", C.muted)}
+                    {item.processed
+                      ? badge("Done", C.success)
+                      : (
+                        <button
+                          onClick={e => { e.stopPropagation(); generateFromRawItem(item); }}
+                          disabled={generatingId === item.id}
+                          aria-label={`Generate post from: ${item.title}`}
+                          style={{
+                            background: generatingId === item.id ? C.glass2 : C.accent + "18",
+                            color:      generatingId === item.id ? C.muted : C.accent,
+                            border:     `1px solid ${generatingId === item.id ? C.border : C.accent + "44"}`,
+                            padding: "5px 14px", borderRadius: 8,
+                            cursor: generatingId === item.id ? "not-allowed" : "pointer",
+                            fontSize: 11, fontWeight: 700,
+                            fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em",
+                            whiteSpace: "nowrap", transition: "all 0.15s",
+                          }}>
+                          {generatingId === item.id
+                            ? <span style={{ animation: "pulse 1s infinite", display: "inline-block" }}>⏳</span>
+                            : "✦ Generate"}
+                        </button>
+                      )
+                    }
                   </div>
                 </div>
               ))}
@@ -918,13 +1027,109 @@ export default function Dashboard() {
                 );
               })}
             </div>
+
+            {/* ── API Integrations ── */}
+            <div style={{ marginTop: 36 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace",
+                  letterSpacing: "0.1em" }}>API INTEGRATIONS</div>
+                <div style={{ flex: 1, height: 1, background: C.border }} />
+                <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace",
+                  letterSpacing: "0.06em" }}>hardcoded · always active</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {API_SOURCES.map(src => (
+                  <div key={src.id} style={{
+                    ...glass, borderRadius: 12, padding: "14px 20px",
+                    display: "flex", alignItems: "center", gap: 14,
+                    borderColor: src.color + "22",
+                  }}>
+                    {badge(src.label, src.color)}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text,
+                        marginBottom: 3 }}>
+                        {src.description}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.muted,
+                        fontFamily: "'DM Mono', monospace" }}>
+                        {src.endpoint}
+                      </div>
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 12,
+                      fontFamily: "'DM Mono', monospace", minWidth: 80 }}>
+                      {src.category}
+                    </div>
+                    <a
+                      href={src.docsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${src.label} documentation`}
+                      style={{
+                        background: C.glass2, color: C.muted,
+                        border: `1px solid ${C.border}`,
+                        padding: "5px 14px", borderRadius: 8,
+                        fontSize: 11, fontFamily: "'DM Mono', monospace",
+                        letterSpacing: "0.06em", textDecoration: "none",
+                        whiteSpace: "nowrap",
+                      }}>
+                      Docs ↗
+                    </a>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6,
+                      flexShrink: 0 }}>
+                      <span style={{
+                        width: 7, height: 7, borderRadius: "50%",
+                        background: C.success, boxShadow: `0 0 6px ${C.success}`,
+                      }} />
+                      <span style={{ fontSize: 11, color: C.success,
+                        fontFamily: "'DM Mono', monospace", fontWeight: 700,
+                        letterSpacing: "0.06em" }}>ALWAYS ON</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
-      </main>
 
         {/* ── Create (Manual) ── */}
         {tab === "create" && (
           <div style={{ maxWidth: 800 }}>
+
+            {/* Content type toggle + History button */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[
+                  { id: "news",   label: "📰 News" },
+                  { id: "thesis", label: "📊 Investment Thesis" },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setContentType(opt.id)}
+                    style={{
+                      background: contentType === opt.id ? C.accent + "18" : C.glass2,
+                      color:      contentType === opt.id ? C.accent : C.muted,
+                      border:     `1px solid ${contentType === opt.id ? C.accent + "44" : C.border}`,
+                      padding: "7px 18px", borderRadius: 8, cursor: "pointer",
+                      fontSize: 12, fontFamily: "'DM Mono', monospace",
+                      letterSpacing: "0.06em", transition: "all 0.15s",
+                    }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowHistory(true)}
+                disabled={genHistory.length === 0}
+                style={{
+                  background: C.glass2, color: genHistory.length > 0 ? C.muted : C.muted + "44",
+                  border: `1px solid ${C.border}`, padding: "7px 16px", borderRadius: 8,
+                  cursor: genHistory.length > 0 ? "pointer" : "default",
+                  fontSize: 12, fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>
+                ⏱ History {genHistory.length > 0 && `(${genHistory.length})`}
+              </button>
+            </div>
 
             {/* Input */}
             <div style={{ marginBottom: 16 }}>
@@ -937,7 +1142,9 @@ export default function Dashboard() {
                 id="manual-input"
                 value={manualInput}
                 onChange={e => setManualInput(e.target.value)}
-                placeholder="Paste an article, tweet thread, news item, or any content here. Grok will turn it into a Thai Facebook post using your prompt."
+                placeholder={contentType === "thesis"
+                  ? "Paste an investment thesis, research report, or on-chain analysis here. Include valuation data, catalysts, and risks for best results."
+                  : "Paste an article, tweet thread, news item, or any content here. Grok will turn it into a Thai Facebook post."}
                 rows={10}
                 style={{
                   width: "100%", background: C.glass,
@@ -1013,6 +1220,115 @@ export default function Dashboard() {
             )}
           </div>
         )}
+      </main>
+
+      {/* ── History Drawer ── */}
+      {showHistory && (
+        <div role="dialog" aria-modal="true" aria-label="Generation history"
+          style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", justifyContent: "flex-end" }}>
+          {/* Backdrop */}
+          <div onClick={() => setShowHistory(false)} style={{
+            position: "absolute", inset: 0,
+            background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+          }} />
+          {/* Drawer panel */}
+          <div style={{
+            position: "relative", width: 500, maxWidth: "90vw",
+            background: "#0d0d1a", borderLeft: `1px solid ${C.border}`,
+            display: "flex", flexDirection: "column",
+            animation: "slideIn 0.22s ease",
+          }}>
+            {/* Header */}
+            <div style={{ padding: "24px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800,
+                  fontSize: 16, color: C.text }}>Generation History</div>
+                <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
+                  {genHistory.length} generation{genHistory.length !== 1 ? "s" : ""} · synced to Supabase
+                </div>
+              </div>
+              <button aria-label="Close history" onClick={() => setShowHistory(false)} style={{
+                background: C.glass2, border: `1px solid ${C.border}`, color: C.muted,
+                cursor: "pointer", width: 32, height: 32, borderRadius: 8,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+              }}>✕</button>
+            </div>
+
+            {/* List */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px",
+              display: "flex", flexDirection: "column", gap: 10 }}>
+              {genHistory.length === 0
+                ? <EmptyState icon="⏱" title="No history yet"
+                    message="Generated posts will appear here automatically." />
+                : genHistory.map(entry => (
+                  <div key={entry.id} style={{ ...glass, borderRadius: 12, padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between",
+                      alignItems: "flex-start", marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: C.muted,
+                        fontFamily: "'DM Mono', monospace" }}>
+                        {format(new Date(entry.created_at), "MMM d, HH:mm")}
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          onClick={() => { setManualOutput(entry.output); setShowHistory(false); }}
+                          style={{
+                            background: C.accent + "18", color: C.accent,
+                            border: `1px solid ${C.accent}44`, padding: "4px 12px",
+                            borderRadius: 6, cursor: "pointer", fontSize: 11,
+                            fontFamily: "'DM Mono', monospace", fontWeight: 700,
+                          }}>Restore</button>
+                        <button
+                          aria-label="Delete entry"
+                          className="del-btn"
+                          onClick={() => deleteHistoryEntry(entry.id)}
+                          style={{
+                            background: "none", color: C.muted, border: "none",
+                            cursor: "pointer", width: 28, height: 28, borderRadius: 6,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 14, transition: "all 0.15s",
+                          }}>✕</button>
+                      </div>
+                    </div>
+                    {entry.input_snippet && (
+                      <div style={{
+                        fontSize: 11, color: C.muted, fontFamily: "'DM Mono', monospace",
+                        background: "rgba(255,255,255,0.03)", borderRadius: 6,
+                        padding: "6px 10px", marginBottom: 8, lineHeight: 1.5,
+                        overflow: "hidden", textOverflow: "ellipsis",
+                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                      }}>{entry.input_snippet}{entry.input_snippet.length >= 200 ? "…" : ""}</div>
+                    )}
+                    <div style={{
+                      fontSize: 13, color: C.text + "bb", lineHeight: 1.6,
+                      overflow: "hidden", textOverflow: "ellipsis",
+                      display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical",
+                    }}>{entry.output}</div>
+                  </div>
+                ))
+              }
+            </div>
+
+            {/* Footer */}
+            {genHistory.length > 0 && (
+              <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}` }}>
+                <button
+                  onClick={async () => {
+                    if (confirm("Clear all generation history?")) {
+                      await supabase.from("create_history").delete().not("id", "is", null);
+                    }
+                  }}
+                  style={{
+                    background: "none", color: C.error + "88",
+                    border: `1px solid ${C.error}33`, padding: "7px 16px",
+                    borderRadius: 8, cursor: "pointer", fontSize: 11,
+                    fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em",
+                  }}>Clear all history</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Toast ── */}
       {toast && (
