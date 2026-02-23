@@ -520,6 +520,7 @@ export default function Dashboard() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
         * { box-sizing: border-box; margin: 0; }
+        html, body { max-width: 100%; overflow-x: hidden; }
         .nav-btn:hover { background: rgba(255,255,255,0.06) !important; color: ${C.text} !important; }
         .nav-btn:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; border-radius: 8px; }
         .glass-row { transition: background 0.15s, border-color 0.15s; }
@@ -538,7 +539,7 @@ export default function Dashboard() {
         /* ── Mobile ── */
         @media (max-width: 767px) {
           .desktop-sidebar { display: none !important; }
-          .main-content { margin-left: 0 !important; padding: 72px 16px 80px !important; max-width: 100vw !important; }
+          .main-content { margin-left: 0 !important; padding: 72px 16px 80px !important; width: 100% !important; max-width: 100vw !important; overflow-x: hidden !important; }
           .mobile-header {
             display: flex !important;
             position: fixed; top: 0; left: 0; right: 0; z-index: 110;
@@ -563,8 +564,9 @@ export default function Dashboard() {
           .item-row-scores { display: none !important; }
           .item-row-right { width: 100%; justify-content: space-between !important;
             border-top: 1px solid ${C.border}; padding-top: 10px; margin-top: 4px; }
-          .queue-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 10px !important; }
-          .queue-row-actions { flex-basis: 100%; border-top: 1px solid ${C.border}; padding-top: 10px; }
+          .queue-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 10px !important; width: 100% !important; overflow: hidden !important; }
+          .queue-row-actions { width: 100% !important; flex-shrink: 0; border-top: 1px solid ${C.border}; padding-top: 10px; display: flex !important; gap: 8px !important; }
+          .queue-row-actions button { flex: 1 !important; }
         }
       `}</style>
 
