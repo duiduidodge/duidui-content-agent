@@ -12,7 +12,7 @@ const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
 // ─────────────────────────────────────────────────────────────
 
 const NEWS_EDITOR_PROMPT = (idea) =>
-`Act as the Editor-in-Chief for Noon Feed, a premium Thai crypto news platform. I will provide you with a source article.
+`Act as the Editor-in-Chief for a premium Thai crypto news platform. I will provide you with a source article.
 
 Your job is NOT to write the final article. Your job is to analyze the news and create a custom structural blueprint for my writer. The goal is to make every piece of content feel organic, uniquely structured, and perfectly suited to the specific narrative of the news.
 
@@ -40,7 +40,7 @@ ${idea}
 </source>`;
 
 const THESIS_EDITOR_PROMPT = (idea) =>
-`Act as the Editor-in-Chief for Noon Feed, a premium Thai crypto investment media platform. I will provide you with an investment thesis or BidClub pitch.
+`Act as the Editor-in-Chief for a premium Thai crypto investment media platform. I will provide you with an investment thesis or BidClub pitch.
 
 Your job is NOT to write the final post. Your job is to analyze the thesis and create a custom structural blueprint for my writer. The goal is to make every piece of content feel organic, uniquely structured, and perfectly suited to the specific investment narrative.
 

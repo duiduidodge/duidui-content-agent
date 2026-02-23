@@ -60,7 +60,7 @@ async function sendTelegramMessage({ title, body, sourceUrl }) {
 //  PROMPTS — Step 1: Editor-in-Chief (blueprint)
 // ─────────────────────────────────────────────────────────────
 function buildNewsEditorPrompt(idea) {
-  return `Act as the Editor-in-Chief for Noon Feed, a premium Thai crypto news platform. I will provide you with a source article.
+  return `Act as the Editor-in-Chief for a premium Thai crypto news platform. I will provide you with a source article.
 
 Your job is NOT to write the final article. Your job is to analyze the news and create a custom structural blueprint for my writer. The goal is to make every piece of content feel organic, uniquely structured, and perfectly suited to the specific narrative of the news.
 
