@@ -52,6 +52,49 @@ const badge = (label, color) => (
 
 const STATUS_COLOR = { draft: C.muted, approved: C.accent, published: C.success, rejected: C.error };
 const SOURCE_ICON  = { rss: "📡", reddit: "🟠", hackernews: "🔶", twitter: "𝕏", bidclub: "💼" };
+const SOURCE_COLOR = { rss: C.accent2, reddit: C.accent3, hackernews: "#ff6600", twitter: "#1d9bf0", bidclub: "#f59e0b" };
+
+const DOMAIN_NAMES = {
+  "cointelegraph.com":   "CoinTelegraph",
+  "coindesk.com":        "CoinDesk",
+  "decrypt.co":          "Decrypt",
+  "theblock.co":         "The Block",
+  "blockworks.co":       "Blockworks",
+  "cryptoslate.com":     "CryptoSlate",
+  "beincrypto.com":      "BeInCrypto",
+  "bitcoinmagazine.com": "Bitcoin Magazine",
+  "dlnews.com":          "DL News",
+  "unchainedcrypto.com": "Unchained",
+  "cryptobriefing.com":  "Crypto Briefing",
+  "cryptonews.com":      "CryptoNews",
+  "u.today":             "U.Today",
+  "ambcrypto.com":       "AMBCrypto",
+  "newsbtc.com":         "NewsBTC",
+  "theinformation.com":  "The Information",
+  "wired.com":           "Wired",
+  "techcrunch.com":      "TechCrunch",
+  "reuters.com":         "Reuters",
+  "bloomberg.com":       "Bloomberg",
+  "wsj.com":             "WSJ",
+  "ft.com":              "FT",
+  "forbes.com":          "Forbes",
+};
+
+function getSourceLabel(item) {
+  if (item.source === "reddit") {
+    const m = item.source_url?.match(/reddit\.com\/r\/([^/?#]+)/i);
+    return m ? `r/${m[1]}` : "Reddit";
+  }
+  if (item.source === "twitter")    return item.author ? `@${item.author}` : "X";
+  if (item.source === "hackernews") return "Hacker News";
+  if (item.source === "bidclub")    return "BidClub";
+  try {
+    const hostname = new URL(item.source_url).hostname.replace(/^www\./, "");
+    return DOMAIN_NAMES[hostname] ?? hostname;
+  } catch {
+    return item.author || "RSS";
+  }
+}
 
 // ─── empty state ─────────────────────────────────────────────
 function EmptyState({ icon, title, message }) {
@@ -853,6 +896,7 @@ export default function Dashboard() {
                         onClick={e => e.stopPropagation()}>{item.title}</a>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      {item.source && badge(getSourceLabel(item), SOURCE_COLOR[item.source] ?? C.muted)}
                       {item.category && badge(item.category, C.accent2)}
                       {item.sentiment && badge(item.sentiment,
                         item.sentiment === "positive" ? C.success :
@@ -942,6 +986,7 @@ export default function Dashboard() {
                         onClick={e => e.stopPropagation()}>{item.title}</a>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      {item.source && badge(getSourceLabel(item), SOURCE_COLOR[item.source] ?? C.muted)}
                       {item.category && badge(item.category, C.accent2)}
                       {item.sentiment && badge(item.sentiment,
                         item.sentiment === "positive" ? C.success :
