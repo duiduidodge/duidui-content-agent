@@ -133,7 +133,7 @@ async function generateFacebookPost(item) {
 
   const isThesis = item.source === "bidclub";
   const response = await client.chat.completions.create({
-    model:      "x-ai/grok-4.1-fast",
+    model:      "openai/gpt-5-mini",
     max_tokens: isThesis ? 2500 : 2000,
     messages:   [{ role: "user", content: isThesis ? buildThesisPrompt(idea) : buildPrompt(idea) }],
   });

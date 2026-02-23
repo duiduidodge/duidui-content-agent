@@ -144,6 +144,11 @@ export default function Dashboard() {
       supabase.from("pipeline_runs").select("*").order("started_at", { ascending: false }).limit(30),
     ]);
 
+    const firstError = rawRes.error || genRes.error || runsRes.error;
+    if (firstError) {
+      showToast(`Supabase query failed: ${firstError.message}`, "error");
+    }
+
     const raw     = rawRes.data  ?? [];
     const gen     = genRes.data  ?? [];
     const runData = runsRes.data ?? [];

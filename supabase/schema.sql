@@ -33,7 +33,7 @@ create index if not exists raw_content_fetched_at_idx on raw_content(fetched_at 
 -- ─────────────────────────────────────────────────────────────
 -- 2. GENERATED CONTENT  (Agent 2 writes here)
 -- ─────────────────────────────────────────────────────────────
-create type content_platform as enum ('twitter_thread', 'blog_article');
+create type content_platform as enum ('twitter_thread', 'blog_article', 'facebook_post');
 create type content_status   as enum ('draft', 'approved', 'published', 'rejected');
 
 create table if not exists generated_content (
@@ -92,6 +92,16 @@ create policy "service role full access" on generated_content
 
 create policy "service role full access" on pipeline_runs
   for all using (auth.role() = 'service_role');
+
+-- Dashboard reads with anon key (NEXT_PUBLIC_SUPABASE_ANON_KEY)
+create policy "anon read raw_content" on raw_content
+  for select using (true);
+
+create policy "anon read generated_content" on generated_content
+  for select using (true);
+
+create policy "anon read pipeline_runs" on pipeline_runs
+  for select using (true);
 
 -- ─────────────────────────────────────────────────────────────
 -- 5. SOURCES  (dashboard manages, agents read)

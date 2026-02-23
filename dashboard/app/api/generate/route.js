@@ -92,7 +92,7 @@ export async function POST(request) {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model:      "x-ai/grok-4.1-fast",
+        model:      "openai/gpt-5-mini",
         max_tokens: type === "thesis" ? 2500 : 2000,
         messages:   [{ role: "user", content: type === "thesis"
           ? THESIS_PROMPT_TEMPLATE(content.trim())
