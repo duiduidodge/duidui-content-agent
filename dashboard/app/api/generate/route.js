@@ -12,35 +12,57 @@ const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
 // ─────────────────────────────────────────────────────────────
 
 const NEWS_EDITOR_PROMPT = (idea) =>
-`Act as the Editor-in-Chief for a Thai crypto news platform. I will provide you with a source article.
-Your job is NOT to write the final article. Your job is to analyze the news and create a custom structural blueprint for my writer.
+`Act as the Editor-in-Chief for Noon Feed, a premium Thai crypto news platform. I will provide you with a source article.
 
-Step 1: Determine the "Vibe" of the news (e.g., Urgent FUD, Technical Deep-Dive, Bullish Institutional Adoption, Memecoin Degeneracy).
-Step 2: Create a custom outline. You MUST include our mandatory sections ("ทำไมเรื่องนี้สำคัญ" and "ต้องระวังอะไร") and a final CTA question.
-Step 3: Tell the writer exactly how to start the article (e.g., "Start with a shocking statistic about the liquidation," or "Start with a rhetorical question about DeFi regulation").
-Step 4: Decide what the emoji bullet points should focus on (e.g., "Use the bullets to list the 3 main technical upgrades").
+Your job is NOT to write the final article. Your job is to analyze the news and create a custom structural blueprint for my writer. The goal is to make every piece of content feel organic, uniquely structured, and perfectly suited to the specific narrative of the news.
 
-Output only the strategy and blueprint.
+Step 1: Determine the "Vibe & Core Narrative" of the news (e.g., Urgent FUD, Technical Deep-Dive, Bullish Institutional Adoption, Memecoin Degeneracy, Regulatory Shift).
+
+Step 2: Choose the best "Storytelling Framework." DO NOT use the same generic structure every time. Choose the most appropriate flow from these options (or invent a better one):
+   - The "Timeline" Flow: Best for hacks, collapses, or unfolding drama (Hook -> How it started -> The climax -> The fallout).
+   - The "Impact" Flow: Best for institutional news or major upgrades (Hook -> The core event -> The ripple effect on retail/builders -> Unanswered questions).
+   - The "Debunking" Flow: Best for FUD or complex technical misunderstandings (The rumor -> The actual truth -> The technical explanation -> Why the market overreacted).
+
+Step 3: Create the custom outline. Give the writer specific instructions on how to structure the article based on your chosen framework. Provide exact (but varied) subheadings that fit the story perfectly. NEVER use generic subheadings like "ทำไมเรื่องนี้สำคัญ" or "ต้องระวังอะไร".
+
+Step 4: Define the Hook Strategy. Tell the writer exactly how to open the article (e.g., "Start with the staggering dollar amount lost," "Open with a rhetorical question about DeFi regulation," or "Begin with a stark contrast between Web2 and Web3").
+
+Step 5: Define the CTA. Provide a highly specific, thought-provoking question tied directly to the core dilemma of the news to end the article.
+
+Strict Constraints for the Blueprint:
+- NO EMOJIS. Instruct the writer strictly not to use emojis in the final output.
+- The outline must guide the writer to use cohesive, flowing paragraphs and professional journalistic formatting (bullet points are allowed only if strictly necessary for data/lists, but not as the main body).
+
+Output only the strategy and blueprint in JSON format using these exact keys: "vibe", "framework", "hook_strategy", "custom_outline", "cta_question".
 
 <source>
 ${idea}
 </source>`;
 
 const THESIS_EDITOR_PROMPT = (idea) =>
-`Act as the Editor-in-Chief for a Thai crypto investment media platform. I will provide you with an investment thesis or BidClub pitch.
-Your job is NOT to write the final post. Your job is to analyze the thesis and create a custom structural blueprint for my writer.
+`Act as the Editor-in-Chief for Noon Feed, a premium Thai crypto investment media platform. I will provide you with an investment thesis or BidClub pitch.
 
-Step 1: Determine the "Vibe" of the thesis. Choose from archetypes such as: Contrarian Undervalued Gem, Macro Tailwind Play, Fundamentals-First Deep Value, Speculative High-Risk/High-Reward, or Narrative Momentum Trade. Be specific — name the archetype and explain in one sentence why this thesis fits it.
+Your job is NOT to write the final post. Your job is to analyze the thesis and create a custom structural blueprint for my writer. The goal is to make every piece of content feel organic, uniquely structured, and perfectly suited to the specific investment narrative.
 
-Step 2: Create a custom outline. You MUST include our mandatory sections for all thesis posts: one section covering the core valuation gap or mispricing argument ("ทำไมมันถูกมองข้าม"), one section covering the primary downside scenario ("ความเสี่ยงที่ต้องรู้"), and a final CTA question. Beyond these mandatory sections, design 2-3 additional outline sections that are unique to this specific thesis (e.g., "Tokenomics Catalyst," "Regulatory Tailwind," "On-Chain Evidence," "Protocol Revenue Breakdown").
+Step 1: Determine the "Vibe & Core Thesis Archetype" (e.g., Contrarian Undervalued Gem, Macro Tailwind Play, Fundamentals-First Deep Value, Speculative High-Risk/High-Reward, Narrative Momentum Trade, Catalyst-Driven Mispricing). Be specific — name the archetype and explain in one sentence why this thesis fits it.
 
-Step 3: Tell the writer exactly how to open the post. Give one concrete instruction, such as: "Open with the most striking valuation discrepancy as a hard number comparison," or "Open with the single most compelling on-chain data point that proves adoption."
+Step 2: Choose the best "Thesis Storytelling Framework." DO NOT use the same generic structure every time. Choose the most appropriate flow from these options (or invent a better one):
+   - The "Mispricing" Flow: Best for undervalued assets the market has overlooked (Hook -> The market's wrong assumption -> The actual data -> The valuation gap -> The catalyst to close it).
+   - The "Catalyst" Flow: Best for near-term event-driven setups (Hook -> What's about to change -> Why the market hasn't priced it in -> The risk/reward -> The trade thesis).
+   - The "Comparison" Flow: Best for peer-relative value plays (Hook -> The peer comparison data -> Why this asset is structurally different -> The mispricing -> The risk).
 
-Step 4: Specify what the ✅ bullet points should highlight. Instruct the writer to focus them on the strongest quantitative arguments with specific numbers, the competitive moat evidence, and the catalyst timeline.
+Step 3: Create the custom outline. Give the writer specific instructions based on your chosen framework. Provide exact (but varied) subheadings that fit this specific thesis. NEVER use generic subheadings like "ทำไมมันถูกมองข้าม" or "ความเสี่ยงที่ต้องรู้" — replace them with subheadings specific to this asset and thesis.
 
-Step 5: Specify what the 📌 catalyst bullets should cover. Tell the writer which 2-3 specific upcoming events, dates, or milestones from the thesis to prioritize, and whether the tone should be confident or cautious.
+Step 4: Define the Hook Strategy. Tell the writer exactly how to open the post (e.g., "Open with the most striking valuation discrepancy as a hard number comparison," "Start with the on-chain metric that proves adoption is accelerating," or "Open with a rhetorical question that challenges the reader's assumption about this asset class").
 
-Output only the strategy and blueprint. Do not write any Thai. Do not write the final post.
+Step 5: Define the CTA. Provide a highly specific, thought-provoking question tied directly to the core investment dilemma of this thesis — the trade-off the reader must weigh.
+
+Strict Constraints for the Blueprint:
+- NO EMOJIS. Instruct the writer strictly not to use emojis in the final output.
+- The outline must preserve all key numbers, ratios, and named protocols from the source. Instruct the writer to never omit or approximate data.
+- The outline must include one section dedicated to the primary downside risk — the specific scenario where the thesis breaks.
+
+Output only the strategy and blueprint in JSON format using these exact keys: "vibe", "framework", "hook_strategy", "custom_outline", "cta_question".
 
 <source>
 ${idea}

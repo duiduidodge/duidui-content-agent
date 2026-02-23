@@ -60,15 +60,28 @@ async function sendTelegramMessage({ title, body, sourceUrl }) {
 //  PROMPTS — Step 1: Editor-in-Chief (blueprint)
 // ─────────────────────────────────────────────────────────────
 function buildNewsEditorPrompt(idea) {
-  return `Act as the Editor-in-Chief for a Thai crypto news platform. I will provide you with a source article.
-Your job is NOT to write the final article. Your job is to analyze the news and create a custom structural blueprint for my writer.
+  return `Act as the Editor-in-Chief for Noon Feed, a premium Thai crypto news platform. I will provide you with a source article.
 
-Step 1: Determine the "Vibe" of the news (e.g., Urgent FUD, Technical Deep-Dive, Bullish Institutional Adoption, Memecoin Degeneracy).
-Step 2: Create a custom outline. You MUST include our mandatory sections ("ทำไมเรื่องนี้สำคัญ" and "ต้องระวังอะไร") and a final CTA question.
-Step 3: Tell the writer exactly how to start the article (e.g., "Start with a shocking statistic about the liquidation," or "Start with a rhetorical question about DeFi regulation").
-Step 4: Decide what the emoji bullet points should focus on (e.g., "Use the bullets to list the 3 main technical upgrades").
+Your job is NOT to write the final article. Your job is to analyze the news and create a custom structural blueprint for my writer. The goal is to make every piece of content feel organic, uniquely structured, and perfectly suited to the specific narrative of the news.
 
-Output only the strategy and blueprint.
+Step 1: Determine the "Vibe & Core Narrative" of the news (e.g., Urgent FUD, Technical Deep-Dive, Bullish Institutional Adoption, Memecoin Degeneracy, Regulatory Shift).
+
+Step 2: Choose the best "Storytelling Framework." DO NOT use the same generic structure every time. Choose the most appropriate flow from these options (or invent a better one):
+   - The "Timeline" Flow: Best for hacks, collapses, or unfolding drama (Hook -> How it started -> The climax -> The fallout).
+   - The "Impact" Flow: Best for institutional news or major upgrades (Hook -> The core event -> The ripple effect on retail/builders -> Unanswered questions).
+   - The "Debunking" Flow: Best for FUD or complex technical misunderstandings (The rumor -> The actual truth -> The technical explanation -> Why the market overreacted).
+
+Step 3: Create the custom outline. Give the writer specific instructions on how to structure the article based on your chosen framework. Provide exact (but varied) subheadings that fit the story perfectly. NEVER use generic subheadings like "ทำไมเรื่องนี้สำคัญ" or "ต้องระวังอะไร".
+
+Step 4: Define the Hook Strategy. Tell the writer exactly how to open the article (e.g., "Start with the staggering dollar amount lost," "Open with a rhetorical question about DeFi regulation," or "Begin with a stark contrast between Web2 and Web3").
+
+Step 5: Define the CTA. Provide a highly specific, thought-provoking question tied directly to the core dilemma of the news to end the article.
+
+Strict Constraints for the Blueprint:
+- NO EMOJIS. Instruct the writer strictly not to use emojis in the final output.
+- The outline must guide the writer to use cohesive, flowing paragraphs and professional journalistic formatting (bullet points are allowed only if strictly necessary for data/lists, but not as the main body).
+
+Output only the strategy and blueprint in JSON format using these exact keys: "vibe", "framework", "hook_strategy", "custom_outline", "cta_question".
 
 <source>
 ${idea}
