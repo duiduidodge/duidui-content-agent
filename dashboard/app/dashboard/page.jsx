@@ -109,23 +109,23 @@ function EmptyState({ icon, title, message }) {
 }
 
 // ─── stat card ───────────────────────────────────────────────
-function StatCard({ label, value, sub, accent }) {
+function StatCard({ label, value, sub, accent, compact }) {
   return (
-    <div style={{ ...glass, padding: "24px", position: "relative", overflow: "hidden" }}>
+    <div style={{ ...glass, padding: compact ? "16px" : "24px", position: "relative", overflow: "hidden" }}>
       <div style={{
         position: "absolute", top: -24, right: -24,
         width: 88, height: 88, borderRadius: "50%",
         background: accent + "20", filter: "blur(24px)", pointerEvents: "none",
       }} />
-      <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.1em",
-        textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>
+      <div style={{ fontSize: compact ? 9 : 11, color: C.muted, letterSpacing: "0.1em",
+        textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: compact ? 8 : 12 }}>
         {label}
       </div>
-      <div style={{ fontSize: 44, fontFamily: "'Syne', sans-serif",
-        fontWeight: 800, lineHeight: 1, color: C.text, marginBottom: 6 }}>
+      <div style={{ fontSize: compact ? 32 : 44, fontFamily: "'Syne', sans-serif",
+        fontWeight: 800, lineHeight: 1, color: C.text, marginBottom: 4 }}>
         {value ?? "—"}
       </div>
-      {sub && <div style={{ color: C.muted, fontSize: 12 }}>{sub}</div>}
+      {sub && !compact && <div style={{ color: C.muted, fontSize: 12 }}>{sub}</div>}
     </div>
   );
 }
@@ -176,6 +176,7 @@ export default function Dashboard() {
   const [showHistory, setShowHistory] = useState(false);
   const [generatingId, setGeneratingId] = useState(null);
   const [fetching,     setFetching]     = useState(false);
+  const [isMobile,     setIsMobile]     = useState(false);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -264,6 +265,13 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     const ch = supabase.channel("history-changes")
@@ -521,10 +529,72 @@ export default function Dashboard() {
         input:focus, select:focus { outline: none !important; border-color: rgba(232,255,71,0.45) !important; box-shadow: 0 0 0 3px rgba(232,255,71,0.08) !important; }
         a:focus-visible { outline: 2px solid ${C.accent}; outline-offset: 2px; border-radius: 2px; }
         .del-btn:hover { color: ${C.error} !important; background: rgba(255,68,85,0.1) !important; }
+
+        /* ── Mobile ── */
+        .mobile-header { display: none; }
+        .bottom-tab-nav { display: none; }
+        @media (max-width: 767px) {
+          .desktop-sidebar { display: none !important; }
+          .mobile-header {
+            display: flex !important;
+            position: fixed; top: 0; left: 0; right: 0; z-index: 110;
+            height: 56px; padding: 0 16px;
+            background: rgba(7,7,14,0.97); border-bottom: 1px solid ${C.border};
+            backdropFilter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            align-items: center; justify-content: space-between;
+          }
+          .bottom-tab-nav {
+            display: flex !important;
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 110;
+            height: 64px;
+            background: rgba(7,7,14,0.97); border-top: 1px solid ${C.border};
+            backdropFilter: blur(24px); -webkit-backdrop-filter: blur(24px);
+          }
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .charts-row { display: none !important; }
+          .source-form-grid { grid-template-columns: 1fr !important; }
+          .item-row { flex-wrap: wrap !important; }
+          .item-row-scores { display: none !important; }
+          .item-row-right { width: 100%; justify-content: space-between !important;
+            border-top: 1px solid ${C.border}; padding-top: 10px; margin-top: 4px; }
+          .section-header { margin-top: 0 !important; }
+        }
       `}</style>
 
+      {/* ── Mobile Header ── */}
+      <header className="mobile-header">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            background: `linear-gradient(135deg, ${C.accent}, ${C.accent2})`,
+            width: 28, height: 28, borderRadius: 7,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 2px 10px ${C.accent2}44`,
+          }}>
+            <span style={{ color: C.bg, fontSize: 13, fontWeight: 900, fontFamily: "'Syne', sans-serif" }}>A</span>
+          </div>
+          <div>
+            <div style={{ color: C.text, fontSize: 13, fontWeight: 700, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>Agent</div>
+            <div style={{ color: C.muted, fontSize: 9, fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em" }}>content pipeline</div>
+          </div>
+        </div>
+        <button
+          onClick={triggerFetch}
+          disabled={fetching}
+          style={{
+            background: fetching ? C.glass2 : C.accent + "18",
+            color: fetching ? C.muted : C.accent,
+            border: `1px solid ${fetching ? C.border : C.accent + "44"}`,
+            padding: "6px 14px", borderRadius: 8,
+            cursor: fetching ? "not-allowed" : "pointer",
+            fontSize: 11, fontWeight: 700,
+            fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em",
+          }}>
+          {fetching ? "⏳" : "▶ Fetch"}
+        </button>
+      </header>
+
       {/* ── Sidebar ── */}
-      <nav aria-label="Main navigation" style={{
+      <nav aria-label="Main navigation" className="desktop-sidebar" style={{
         width: 240, flexShrink: 0, position: "fixed",
         left: 0, top: 0, bottom: 0, zIndex: 100,
         background: "rgba(7,7,14,0.97)",
@@ -618,21 +688,26 @@ export default function Dashboard() {
       </nav>
 
       {/* ── Main content ── */}
-      <main style={{ marginLeft: 240, flex: 1, padding: "40px 48px",
-        minHeight: "100vh", maxWidth: "calc(100vw - 240px)" }}>
+      <main style={{
+        marginLeft: isMobile ? 0 : 240,
+        flex: 1,
+        padding: isMobile ? "72px 16px 80px" : "40px 48px",
+        minHeight: "100vh",
+        maxWidth: isMobile ? "100vw" : "calc(100vw - 240px)",
+      }}>
 
         {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)",
-          gap: 16, marginBottom: 32 }}>
-          <StatCard label="Raw Items"  value={stats?.totalRaw}  accent={C.accent2} sub="fetched total" />
-          <StatCard label="Generated"  value={stats?.totalGen}  accent={C.accent}  sub="content pieces" />
-          <StatCard label="In Draft"   value={stats?.drafts}    accent={C.muted}   sub="awaiting review" />
-          <StatCard label="Approved"   value={stats?.approved}  accent={C.accent}  sub="ready to publish" />
-          <StatCard label="Published"  value={stats?.published} accent={C.success} sub="live content" />
+        <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)",
+          gap: isMobile ? 10 : 16, marginBottom: isMobile ? 20 : 32 }}>
+          <StatCard label="Raw Items"  value={stats?.totalRaw}  accent={C.accent2} sub="fetched total"     compact={isMobile} />
+          <StatCard label="Generated"  value={stats?.totalGen}  accent={C.accent}  sub="content pieces"  compact={isMobile} />
+          <StatCard label="In Draft"   value={stats?.drafts}    accent={C.muted}   sub="awaiting review" compact={isMobile} />
+          <StatCard label="Approved"   value={stats?.approved}  accent={C.accent}  sub="ready to publish" compact={isMobile} />
+          <StatCard label="Published"  value={stats?.published} accent={C.success} sub="live content"     compact={isMobile} />
         </div>
 
         {/* Charts row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 40 }}>
+        <div className="charts-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 40 }}>
           <div style={{ ...glass, padding: "24px" }}>
             <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 500,
               marginBottom: 20, color: C.muted, letterSpacing: "0.1em",
@@ -680,7 +755,7 @@ export default function Dashboard() {
         </div>
 
         {/* Section header */}
-        <div style={{ marginBottom: 20 }}>
+        <div className="section-header" style={{ marginBottom: isMobile ? 12 : 20, marginTop: isMobile ? 8 : 0 }}>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800,
             color: C.text, marginBottom: 4 }}>
             {tab === "queue"   ? "Content Queue"
@@ -702,7 +777,7 @@ export default function Dashboard() {
 
         {/* ── Content Queue ── */}
         {tab === "queue" && (
-          <div style={{ display: "grid", gridTemplateColumns: selected ? "1fr 460px" : "1fr", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: selected && !isMobile ? "1fr 460px" : "1fr", gap: 16 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {genItems.length === 0 && (
                 <EmptyState icon="✦" title="No content yet"
@@ -789,9 +864,15 @@ export default function Dashboard() {
 
             {/* Preview panel */}
             {selected && (
-              <div style={{ ...glass, padding: "28px", position: "sticky", top: 32,
+              <div style={isMobile ? {
+                position: "fixed", inset: 0, zIndex: 150,
+                background: "#0d0d1a", overflowY: "auto",
+                padding: "24px 16px 100px", animation: "fadeIn 0.2s ease",
+              } : {
+                ...glass, padding: "28px", position: "sticky", top: 32,
                 maxHeight: "calc(100vh - 64px)", overflowY: "auto",
-                animation: "fadeIn 0.2s ease" }}>
+                animation: "fadeIn 0.2s ease",
+              }}>
                 <div style={{ display: "flex", justifyContent: "space-between",
                   alignItems: "flex-start", marginBottom: 24 }}>
                   <div>
@@ -882,7 +963,7 @@ export default function Dashboard() {
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {topPickItems.map(item => (
-                <div key={item.id} className="glass-row" style={{
+                <div key={item.id} className="glass-row item-row" style={{
                   ...glass, borderRadius: 12, padding: "14px 20px",
                   display: "flex", alignItems: "center", gap: 14,
                   borderColor: item.impact_score >= 9 ? C.accent + "33" : C.border,
@@ -907,8 +988,8 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 16, alignItems: "center", flexShrink: 0 }}>
-                    <div style={{ textAlign: "center", minWidth: 36 }}>
+                  <div className="item-row-right" style={{ display: "flex", gap: 16, alignItems: "center", flexShrink: 0 }}>
+                    <div className="item-row-scores" style={{ textAlign: "center", minWidth: 36 }}>
                       <div style={{ fontSize: 20, fontWeight: 800, fontFamily: "'Syne', sans-serif",
                         color: C.accent }}>
                         {item.impact_score.toFixed(1)}
@@ -972,7 +1053,7 @@ export default function Dashboard() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {filteredRaw.map(item => (
-                <div key={item.id} className="glass-row" style={{
+                <div key={item.id} className="glass-row item-row" style={{
                   ...glass, borderRadius: 12, padding: "14px 20px",
                   display: "flex", alignItems: "center", gap: 14,
                 }}>
@@ -997,15 +1078,15 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 16, alignItems: "center", flexShrink: 0 }}>
-                    <div style={{ textAlign: "center", minWidth: 32 }}>
+                  <div className="item-row-right" style={{ display: "flex", gap: 16, alignItems: "center", flexShrink: 0 }}>
+                    <div className="item-row-scores" style={{ textAlign: "center", minWidth: 32 }}>
                       <div style={{ fontSize: 17, fontWeight: 800, fontFamily: "'Syne', sans-serif",
                         color: (item.relevance_score ?? 0) >= 7 ? C.accent : C.muted }}>
                         {(item.relevance_score ?? 0).toFixed(1)}
                       </div>
                       <div style={{ fontSize: 9, color: C.muted, letterSpacing: "0.06em" }}>REL</div>
                     </div>
-                    <div style={{ textAlign: "center", minWidth: 32 }}>
+                    <div className="item-row-scores" style={{ textAlign: "center", minWidth: 32 }}>
                       <div style={{ fontSize: 17, fontWeight: 800, fontFamily: "'Syne', sans-serif",
                         color: (item.novelty_score ?? 0) >= 7 ? C.accent3 : C.muted }}>
                         {(item.novelty_score ?? 0).toFixed(1)}
@@ -1116,7 +1197,7 @@ export default function Dashboard() {
             {showAddForm && (
               <div style={{ ...glass, borderColor: C.accent + "30",
                 padding: "24px", marginBottom: 16, animation: "fadeIn 0.2s ease" }}>
-                <div style={{ display: "grid",
+                <div className="source-form-grid" style={{ display: "grid",
                   gridTemplateColumns: "160px 1fr 180px auto", gap: 12, alignItems: "end" }}>
                   <div>
                     <label htmlFor="src-type" style={{ display: "block", fontSize: 11,
@@ -1446,7 +1527,7 @@ export default function Dashboard() {
           }} />
           {/* Drawer panel */}
           <div style={{
-            position: "relative", width: 500, maxWidth: "90vw",
+            position: "relative", width: isMobile ? "100vw" : 500, maxWidth: "100vw",
             background: "#0d0d1a", borderLeft: `1px solid ${C.border}`,
             display: "flex", flexDirection: "column",
             animation: "slideIn 0.22s ease",
@@ -1542,6 +1623,52 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* ── Bottom Tab Nav (mobile only) ── */}
+      <nav className="bottom-tab-nav" aria-label="Tab navigation">
+        {NAV_ITEMS.map(item => {
+          const isActive = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              aria-current={isActive ? "page" : undefined}
+              style={{
+                flex: 1, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 3,
+                background: "none", border: "none",
+                color: isActive ? C.accent : C.muted,
+                cursor: "pointer", padding: "8px 4px",
+                transition: "color 0.15s",
+                position: "relative",
+              }}>
+              {isActive && (
+                <span style={{
+                  position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+                  width: 24, height: 2, borderRadius: 2,
+                  background: C.accent,
+                }} />
+              )}
+              <span style={{ width: 18, height: 18 }}>{item.icon}</span>
+              <span style={{
+                fontSize: 9, fontWeight: 600, letterSpacing: "0.04em",
+                fontFamily: "'DM Mono', monospace", textTransform: "uppercase",
+                lineHeight: 1,
+              }}>
+                {item.label.split(" ")[0]}
+              </span>
+              {item.count > 0 && (
+                <span style={{
+                  position: "absolute", top: 6, right: "calc(50% - 14px)",
+                  background: C.accent, color: C.bg,
+                  fontSize: 8, fontWeight: 800, borderRadius: 10,
+                  padding: "1px 5px", lineHeight: 1.4, minWidth: 14, textAlign: "center",
+                }}>{item.count}</span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
 
       {/* ── Toast ── */}
       {toast && (
