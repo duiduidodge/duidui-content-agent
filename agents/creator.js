@@ -159,8 +159,8 @@ async function generateFacebookPost(item) {
   // Step 1 — Editor: produce structural blueprint
   console.log(`  → Analyzing… (editor call)`);
   const editorRes = await client.chat.completions.create({
-    model:      "x-ai/grok-4.1-fast",
-    max_tokens: 800,
+    model:      "deepseek/deepseek-v3.2",
+    max_tokens: 1200,
     messages:   [{ role: "user", content: buildNewsEditorPrompt(idea) }],
   });
   const blueprint = editorRes.choices[0].message.content.trim();
@@ -169,7 +169,7 @@ async function generateFacebookPost(item) {
   // Step 2 — Writer: produce final Thai Facebook post
   console.log(`  → Writing… (writer call)`);
   const writerRes = await client.chat.completions.create({
-    model:      "x-ai/grok-4.1-fast",
+    model:      "google/gemini-2.5-flash-lite",
     max_tokens: 2000,
     messages:   [{ role: "user", content: buildNewsWriterPrompt(idea, blueprint) }],
   });

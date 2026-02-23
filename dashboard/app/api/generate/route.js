@@ -4,8 +4,9 @@
 
 import { NextResponse } from "next/server";
 
-const MODEL      = "x-ai/grok-4.1-fast";
-const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL_EDITOR = "deepseek/deepseek-v3.2";
+const MODEL_WRITER = "google/gemini-2.5-flash-lite";
+const OPENROUTER   = "https://openrouter.ai/api/v1/chat/completions";
 
 // ─────────────────────────────────────────────────────────────
 //  STEP 1 PROMPTS — Editor-in-Chief (blueprint)
@@ -132,7 +133,7 @@ ${idea}
 // ─────────────────────────────────────────────────────────────
 //  SHARED LLM HELPER
 // ─────────────────────────────────────────────────────────────
-async function callLLM(apiKey, prompt, maxTokens) {
+async function callLLM(apiKey, prompt, maxTokens, model) {
   const res = await fetch(OPENROUTER, {
     method:  "POST",
     headers: {
@@ -140,7 +141,7 @@ async function callLLM(apiKey, prompt, maxTokens) {
       "Authorization": `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model:      MODEL,
+      model,
       max_tokens: maxTokens,
       messages:   [{ role: "user", content: prompt }],
     }),
@@ -180,7 +181,8 @@ export async function POST(request) {
     const blueprint = await callLLM(
       apiKey,
       isThesis ? THESIS_EDITOR_PROMPT(idea) : NEWS_EDITOR_PROMPT(idea),
-      800,
+      1200,
+      MODEL_EDITOR,
     );
 
     // Step 2 — Writer: generate final Thai Facebook post
@@ -188,6 +190,7 @@ export async function POST(request) {
       apiKey,
       isThesis ? THESIS_WRITER_PROMPT(idea, blueprint) : NEWS_WRITER_PROMPT(idea, blueprint),
       isThesis ? 2500 : 2000,
+      MODEL_WRITER,
     );
 
     return NextResponse.json({ text });
