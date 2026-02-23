@@ -509,7 +509,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", display: "flex",
-      fontFamily: "'Inter', sans-serif", color: C.text }}>
+      fontFamily: "'Inter', sans-serif", color: C.text, overflowX: "hidden" }}>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
@@ -558,6 +558,10 @@ export default function Dashboard() {
           .item-row-right { width: 100%; justify-content: space-between !important;
             border-top: 1px solid ${C.border}; padding-top: 10px; margin-top: 4px; }
           .section-header { margin-top: 0 !important; }
+          .queue-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 10px !important; }
+          .queue-row-actions { width: 100%; border-top: 1px solid ${C.border};
+            padding-top: 10px; display: flex; gap: 8px; }
+          .stats-grid > *:last-child:nth-child(odd) { grid-column: 1 / -1; }
         }
       `}</style>
 
@@ -784,7 +788,7 @@ export default function Dashboard() {
                   message="Trigger the creator agent from GitHub Actions to generate your first content pieces." />
               )}
               {genItems.map(item => (
-                <div key={item.id} className="glass-row"
+                <div key={item.id} className="glass-row queue-row"
                   role="button" tabIndex={0}
                   aria-pressed={selected?.id === item.id}
                   onClick={() => setSelected(selected?.id === item.id ? null : item)}
@@ -828,14 +832,14 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <div className="queue-row-actions" style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     {item.status === "draft" && <>
                       <button
                         aria-label="Approve content"
                         onClick={e => { e.stopPropagation(); updateStatus(item.id, "approved"); }}
                         style={{ background: C.accent + "18", color: C.accent,
                           border: `1px solid ${C.accent}33`, padding: "6px 14px",
-                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
                         Approve
                       </button>
                       <button
@@ -843,7 +847,7 @@ export default function Dashboard() {
                         onClick={e => { e.stopPropagation(); updateStatus(item.id, "rejected"); }}
                         style={{ background: C.error + "18", color: C.error,
                           border: `1px solid ${C.error}33`, padding: "6px 14px",
-                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
                         Reject
                       </button>
                     </>}
@@ -853,7 +857,7 @@ export default function Dashboard() {
                         onClick={e => { e.stopPropagation(); updateStatus(item.id, "published"); }}
                         style={{ background: C.success + "18", color: C.success,
                           border: `1px solid ${C.success}33`, padding: "6px 14px",
-                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
                         Publish
                       </button>
                     )}
