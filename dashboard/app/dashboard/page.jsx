@@ -132,10 +132,25 @@ export default function Dashboard() {
   const [genHistory,  setGenHistory]  = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [generatingId, setGeneratingId] = useState(null);
+  const [fetching,     setFetching]     = useState(false);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const triggerFetch = async () => {
+    setFetching(true);
+    try {
+      const res  = await fetch("/api/fetch", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to trigger fetch");
+      showToast("Researcher triggered — results in ~2 min");
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setFetching(false);
+    }
   };
 
   const loadData = useCallback(async () => {
@@ -538,6 +553,24 @@ export default function Dashboard() {
             letterSpacing: "0.1em", marginBottom: 12 }}>AGENTS</div>
           <AgentStatus label="Researcher" run={stats?.lastResearcher} />
           <AgentStatus label="Creator"    run={stats?.lastCreator} />
+          <button
+            onClick={triggerFetch}
+            disabled={fetching}
+            style={{
+              marginTop: 12, width: "100%",
+              background: fetching ? C.glass2 : C.accent + "18",
+              color:      fetching ? C.muted : C.accent,
+              border:     `1px solid ${fetching ? C.border : C.accent + "44"}`,
+              padding: "8px 0", borderRadius: 8,
+              cursor: fetching ? "not-allowed" : "pointer",
+              fontSize: 11, fontWeight: 700,
+              fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em",
+              transition: "all 0.15s",
+            }}>
+            {fetching
+              ? <span style={{ animation: "pulse 1s infinite", display: "inline-block" }}>⏳ Triggering…</span>
+              : "▶ Fetch Now"}
+          </button>
         </div>
       </nav>
 
