@@ -13,7 +13,7 @@ const client = new OpenAI({
 // ─────────────────────────────────────────────────────────────
 //  CONFIG
 // ─────────────────────────────────────────────────────────────
-const IMPACT_THRESHOLD  = 6.5;
+const IMPACT_THRESHOLD  = 8.0;
 const MAX_ITEMS_PER_RUN = 5;
 
 function escapeHtml(text = "") {
@@ -101,26 +101,26 @@ ${idea}
 }
 
 function buildPrompt(idea) {
-  return `# Role & Tone
-Act as an expert crypto content creator and a knowledgeable friend. Your tone should be engaging, insightful, and natural for a Thai crypto-native audience. Write in a conversational Thai style, avoiding robotic wording or direct-translation phrasing.
+  return `# Role & Persona
+Act as a top-tier crypto journalist and a knowledgeable friend writing for a Thai crypto community. Your tone is engaging, insightful, natural, and highly variable depending on the vibe of the news (e.g., urgent for price crashes, analytical for adoption news, entertaining for memecoins).
 
 # Task
-Analyze the provided <resource> and create a highly engaging, mobile-friendly crypto news summary based strictly on the content provided.
+Write a highly engaging, mobile-friendly crypto news summary based strictly on the provided <resource>. Minimum 700 Thai characters.
 
-# Strict Constraints
-- Language: Natural Thai.
-- Length: Minimum 700 Thai characters.
-- Formatting: No em-dash (—), use short paragraphs optimized for mobile reading (2-3 lines max per paragraph).
-- Style: Simplify complex crypto technical jargon (e.g., FOCIL, Cypherpunk, Mempool) so a general user can easily understand, while keeping the core meaning accurate.
-- Content: NO puffery, NO filler words, NO fluff. Get straight to the facts.
-- Restriction: DO NOT invent information. DO NOT add any extra sections or headings that are not explicitly requested below.
+# Strict Constraints & Negative Prompts (CRITICAL)
+- NO meta-commentary: NEVER use phrases like "ตามรายงาน", "จากแหล่งข้อมูล", "ข่าวนี้ระบุว่า", or "หัวข้อข่าวที่ให้มา". Report the news directly and confidently as your own content.
+- NO repeating the hook: Write the opening hook ONCE. Do not copy-paste the title into the first line.
+- NO generic CTAs: NEVER end with a basic "คุณคิดว่ายังไง?".
+- NO stiff translations: Use natural Thai phrasing.
+- NO em-dashes (—), NO puffery, NO filler.
+- Simplify complex jargon seamlessly so a general user understands.
 
-# Required Structure
-1. Hook: Start with 1-2 punchy, scroll-stopping sentences. DO NOT use cliche openings like "ข่าวร้อนในวงการคริปโต". Hook the reader with the core impact or a thought-provoking angle.
-2. Body & Key Takeaways: Summarize the key events using at least 5 bullet points. You MUST use varied and context-relevant emojis for each bullet (do not just repeat the same emoji). Make the bullets punchy and informative.
-3. ทำไมเรื่องนี้สำคัญ: (Use this exact heading). Explain the core impact and why the audience should care.
-4. ต้องระวังอะไร: (Use this exact heading). Highlight the risks, criticisms, or potential downsides mentioned in the text.
-5. Ending CTA: End with a single, engaging question to encourage community discussion.
+# Required Structure (Be creative with the delivery)
+1. The Hook: 1-2 punchy sentences. Vary your opening style—sometimes start with a shocking stat, sometimes a bold statement, sometimes a rhetorical question.
+2. The Breakdown: Use short mobile paragraphs and at least 5 bullet points (with varied, context-specific emojis, not just ✅ or -). Use these bullets to dynamically explain timelines, key players, or core mechanics.
+3. ทำไมเรื่องนี้สำคัญ: (Use this exact heading). Explain the macro impact. Don't just summarize; analyze *why* a retail investor, builder, or the broader market should care.
+4. ต้องระวังอะไร: (Use this exact heading). Highlight hidden risks, potential FUD, extreme volatility, or what investors should double-check before making a move.
+5. Ending CTA: Ask one highly specific, thought-provoking question tied directly to the core dilemma of the news to spark debate in the comments.
 
 <resource>
 ${idea}
@@ -146,7 +146,7 @@ async function getHighImpactContent() {
       ...item,
       impact_score: (item.relevance_score ?? 0) * 0.6 + (item.novelty_score ?? 0) * 0.4,
     }))
-    .filter(item => item.impact_score >= IMPACT_THRESHOLD)
+    .filter(item => item.impact_score > IMPACT_THRESHOLD)
     .sort((a, b) => b.impact_score - a.impact_score)
     .slice(0, MAX_ITEMS_PER_RUN);
 
