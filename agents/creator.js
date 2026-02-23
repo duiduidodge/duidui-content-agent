@@ -83,7 +83,7 @@ function buildNewsWriterPrompt(idea, blueprint) {
 Act as a top-tier crypto journalist and expert creator writing a high-quality news article for a Thai crypto community. Your tone is engaging, insightful, and professional yet accessible. Do not sound like a robotic summarizer; write like a seasoned reporter telling a compelling story.
 
 # Task
-Write a comprehensive, mobile-friendly crypto news article based strictly on the provided <resource>. Follow the structure and tone instructions in the provided <blueprint> exactly. Minimum 700 Thai characters.
+Write a comprehensive, mobile-friendly crypto news article based strictly on the provided <resource>. Minimum 700 Thai characters.
 
 # Strict Constraints & Negative Prompts (CRITICAL)
 - NO listicle vibes: The main body must be written in cohesive, flowing paragraphs (news article style), not just bullet points.
