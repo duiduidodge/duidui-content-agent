@@ -30,6 +30,7 @@ jobs:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           BIDCLUB_API_KEY:      ${{ secrets.BIDCLUB_API_KEY }}
+          XAI_API_KEY:          ${{ secrets.XAI_API_KEY }}
         run: node agents/researcher.js
 
       - name: Notify on failure

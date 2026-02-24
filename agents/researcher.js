@@ -115,34 +115,65 @@ async function fetchHackerNews() {
 }
 
 async function fetchXAccount(handle, category) {
-  // handle is stored without @, e.g. "VitalikButerin"
-  const prompt = `You have access to X (Twitter). Retrieve the most recent posts from @${handle} from the last 6 hours that meet ALL of these criteria:
-- Contains original analysis, data, or a specific insight (not just a link share with no commentary)
+  // Uses xAI API directly with x_search tool for real-time X data (not OpenRouter)
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) {
+    console.warn(`⚠️  XAI_API_KEY not set, skipping @${handle}`);
+    return [];
+  }
+
+  const prompt = `Search X for posts from @${handle} published in the last 6 hours.
+
+Only include posts that meet ALL of these criteria:
+- Contains original analysis, a specific data point, or a substantive insight
 - Relevant to crypto, blockchain, Web3, DeFi, macro finance, or tech
-- Not a retweet, reply, or quote tweet with no added commentary
-- Not promotional content, giveaways, or price prediction hype
-- Not generic market noise (e.g. "BTC is pumping", "number go up", "great day for crypto")
-Minimum bar: the post must contain a claim, data point, or insight a reader could act on or learn from.
+- Not a retweet or reply with no added commentary
+- Not promotional content, giveaways, or generic price commentary
+- Minimum bar: the post contains a claim or insight a reader could act on or learn from
 
-Return a JSON array of objects. Each object must have exactly these fields:
-{
-  "title": "first 100 chars of the post text",
-  "body": "full post text",
-  "url": "https://x.com/${handle}/status/<tweet_id>"
-}
+Return ONLY a valid JSON array, no other text:
+[
+  {
+    "title": "first 100 characters of the post text",
+    "body": "full post text verbatim",
+    "url": "https://x.com/${handle}/status/<real_tweet_id>"
+  }
+]
 
-Return between 0 and 6 items. If no posts meet the quality bar in the last 6 hours, return [].
-Return ONLY valid JSON. No markdown, no explanation.`;
+Return between 0 and 6 items. If no posts meet the quality bar, return [].`;
 
   try {
-    const response = await claude.chat.completions.create({
-      model:      "x-ai/grok-4.1-fast",
-      max_tokens: 1500,
-      messages:   [{ role: "user", content: prompt }],
+    const res = await fetch("https://api.x.ai/v1/responses", {
+      method:  "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type":  "application/json",
+      },
+      body: JSON.stringify({
+        model:    "grok-3-mini",
+        tools:    [{ type: "x_search", allowed_handles: [handle] }],
+        messages: [{ role: "user", content: prompt }],
+      }),
     });
 
-    const raw   = response.choices[0].message.content.trim();
-    const posts = JSON.parse(raw);
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`xAI API ${res.status}: ${err}`);
+    }
+
+    const data = await res.json();
+
+    // Extract text from xAI responses API format
+    const text = data.output
+      ?.find(o => o.type === "message")
+      ?.content?.find(c => c.type === "output_text" || c.type === "text")
+      ?.text ?? "[]";
+
+    // Strip markdown code fences if model wraps output
+    const cleaned = text.trim()
+      .replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
+
+    const posts = JSON.parse(cleaned);
     if (!Array.isArray(posts)) return [];
 
     return posts.map(p => ({
