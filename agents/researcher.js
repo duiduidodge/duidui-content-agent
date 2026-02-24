@@ -116,7 +116,13 @@ async function fetchHackerNews() {
 
 async function fetchXAccount(handle, category) {
   // handle is stored without @, e.g. "VitalikButerin"
-  const prompt = `You have access to X (Twitter). Retrieve the most recent posts from @${handle} from the last 6 hours that contain useful, substantive information relevant to crypto, blockchain, Web3, DeFi, or tech. Exclude retweets, replies, and trivial posts.
+  const prompt = `You have access to X (Twitter). Retrieve the most recent posts from @${handle} from the last 6 hours that meet ALL of these criteria:
+- Contains original analysis, data, or a specific insight (not just a link share with no commentary)
+- Relevant to crypto, blockchain, Web3, DeFi, macro finance, or tech
+- Not a retweet, reply, or quote tweet with no added commentary
+- Not promotional content, giveaways, or price prediction hype
+- Not generic market noise (e.g. "BTC is pumping", "number go up", "great day for crypto")
+Minimum bar: the post must contain a claim, data point, or insight a reader could act on or learn from.
 
 Return a JSON array of objects. Each object must have exactly these fields:
 {
@@ -125,7 +131,7 @@ Return a JSON array of objects. Each object must have exactly these fields:
   "url": "https://x.com/${handle}/status/<tweet_id>"
 }
 
-Return between 0 and 6 items. If there are no relevant posts in the last 6 hours, return [].
+Return between 0 and 6 items. If no posts meet the quality bar in the last 6 hours, return [].
 Return ONLY valid JSON. No markdown, no explanation.`;
 
   try {
