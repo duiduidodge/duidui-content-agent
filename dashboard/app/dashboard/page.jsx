@@ -324,6 +324,33 @@ export default function Dashboard() {
     loadData();
   };
 
+  const [savingDocId, setSavingDocId] = useState(null);
+  const saveToDoc = async (e, item) => {
+    e.stopPropagation();
+    setSavingDocId(item.id);
+    try {
+      const res = await fetch("/api/save-to-doc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title:        item.title,
+          body:         item.body,
+          source_url:   item.raw_content?.source_url,
+          platform:     item.platform,
+          impact_score: item.impact_score,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast("Saved to Google Doc");
+      window.open(data.doc_url, "_blank");
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setSavingDocId(null);
+    }
+  };
+
   const toggleSource = async (id, enabled) => {
     await supabase.from("sources").update({ enabled: !enabled }).eq("id", id);
   };
@@ -904,6 +931,17 @@ export default function Dashboard() {
                       Publish
                     </button>
                   )}
+                  <button
+                    aria-label="Save to Google Doc"
+                    onClick={e => saveToDoc(e, item)}
+                    disabled={savingDocId === item.id}
+                    style={{ background: "#1a73e820", color: "#4dabf7",
+                      border: "1px solid #1a73e844", padding: "6px 14px",
+                      borderRadius: 8, cursor: savingDocId === item.id ? "not-allowed" : "pointer",
+                      fontSize: 12, fontWeight: 600, flex: 1,
+                      opacity: savingDocId === item.id ? 0.6 : 1 }}>
+                    {savingDocId === item.id ? "Saving…" : "📄 Doc"}
+                  </button>
                 </div>
               </div>
             ))}
