@@ -176,8 +176,7 @@ export default function Dashboard() {
   const [showHistory, setShowHistory] = useState(false);
   const [generatingId, setGeneratingId] = useState(null);
   const [fetching,     setFetching]     = useState(false);
-  const [isMobile,        setIsMobile]        = useState(false);
-  const [previewOverlay,  setPreviewOverlay]  = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [rawPage,      setRawPage]      = useState(1);
   const [rawTotal,     setRawTotal]     = useState(0);
   const [topPickItems, setTopPickItems] = useState([]);
@@ -300,10 +299,7 @@ export default function Dashboard() {
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
   useEffect(() => {
-    const check = () => {
-      setIsMobile(window.innerWidth < 768);
-      setPreviewOverlay(window.innerWidth < 1100);
-    };
+    const check = () => setIsMobile(window.innerWidth < 768);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -585,6 +581,19 @@ export default function Dashboard() {
         .mobile-header { display: none; }
         .bottom-tab-nav { display: none; }
 
+        /* ── Narrow / Tablet: sidebar stays, preview becomes fullscreen overlay ── */
+        @media (max-width: 1099px) {
+          .queue-grid { grid-template-columns: 1fr !important; }
+          .preview-side-panel {
+            position: fixed !important; inset: 0 !important; z-index: 150 !important;
+            background: #0d0d1a !important; overflow-y: auto !important;
+            padding: 24px 24px 100px !important; max-height: 100vh !important;
+            border-radius: 0 !important; border: none !important;
+            backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+            top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+          }
+        }
+
         /* ── Mobile ── */
         @media (max-width: 767px) {
           .desktop-sidebar { display: none !important; }
@@ -830,7 +839,7 @@ export default function Dashboard() {
 
         {/* ── Content Queue ── */}
         {tab === "queue" && (
-          <div className="queue-grid" style={{ display: "grid", gridTemplateColumns: selected && !previewOverlay ? "1fr 460px" : "1fr", gap: 16 }}>
+          <div className="queue-grid" style={{ display: "grid", gridTemplateColumns: selected ? "1fr 460px" : "1fr", gap: 16 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {genItems.length === 0 && (
                 <EmptyState icon="✦" title="No content yet"
@@ -917,11 +926,7 @@ export default function Dashboard() {
 
             {/* Preview panel */}
             {selected && (
-              <div style={previewOverlay ? {
-                position: "fixed", inset: 0, zIndex: 150,
-                background: "#0d0d1a", overflowY: "auto",
-                padding: "24px 24px 100px", animation: "fadeIn 0.2s ease",
-              } : {
+              <div className="preview-side-panel" style={{
                 ...glass, padding: "28px", position: "sticky", top: 32,
                 maxHeight: "calc(100vh - 64px)", overflowY: "auto",
                 animation: "fadeIn 0.2s ease",
