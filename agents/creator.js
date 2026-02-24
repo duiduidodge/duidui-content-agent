@@ -32,7 +32,6 @@ async function sendTelegramMessage({ title, body, sourceUrl }) {
   const lines = [
     "🆕 <b>New Generated Content</b>",
     title ? `\n<b>${escapeHtml(title)}</b>` : "",
-    body ? `\n\n${escapeHtml(body)}` : "",
     sourceUrl ? `\n\n🔗 ${escapeHtml(sourceUrl)}` : "",
   ];
 
