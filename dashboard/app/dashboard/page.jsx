@@ -177,6 +177,12 @@ export default function Dashboard() {
   const [generatingId, setGeneratingId] = useState(null);
   const [fetching,     setFetching]     = useState(false);
   const [isMobile,     setIsMobile]     = useState(false);
+  const [rawPage,      setRawPage]      = useState(1);
+  const [rawTotal,     setRawTotal]     = useState(0);
+  const [topPickItems, setTopPickItems] = useState([]);
+
+  const PAGE_SIZE       = 25;
+  const PICKS_THRESHOLD = 8.0;
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -198,37 +204,46 @@ export default function Dashboard() {
   };
 
   const loadData = useCallback(async () => {
-    const [rawRes, genRes, runsRes] = await Promise.all([
-      supabase.from("raw_content").select("*").order("fetched_at", { ascending: false }).limit(100),
+    const [genRes, runsRes, rawCountRes, picksRes] = await Promise.all([
       supabase.from("generated_content").select("*, raw_content(title, source, source_url)").order("created_at", { ascending: false }).limit(50),
       supabase.from("pipeline_runs").select("*").order("started_at", { ascending: false }).limit(30),
+      supabase.from("raw_content").select("id", { count: "exact", head: true }),
+      supabase.from("raw_content")
+        .select("*")
+        .eq("processed", false)
+        .gte("relevance_score", 6)
+        .order("relevance_score", { ascending: false })
+        .limit(100),
     ]);
 
-    const firstError = rawRes.error || genRes.error || runsRes.error;
+    const firstError = genRes.error || runsRes.error || rawCountRes.error;
     if (firstError) {
       showToast(`Supabase query failed: ${firstError.message}`, "error");
     }
 
-    const raw     = rawRes.data  ?? [];
-    const gen     = genRes.data  ?? [];
-    const runData = runsRes.data ?? [];
+    const gen      = genRes.data  ?? [];
+    const runData  = runsRes.data ?? [];
+    const totalRaw = rawCountRes.count ?? 0;
 
-    setRawItems(raw);
+    const picks = (picksRes.data ?? [])
+      .map(i => ({ ...i, impact_score: (i.relevance_score ?? 0) * 0.6 + (i.novelty_score ?? 0) * 0.4 }))
+      .filter(i => i.impact_score >= PICKS_THRESHOLD)
+      .sort((a, b) => b.impact_score - a.impact_score);
+
+    setTopPickItems(picks);
     setGenItems(gen);
     setRuns(runData);
+    setRawTotal(totalRaw);
 
     const lastResearcher = runData.find(r => r.agent === "researcher");
     const lastCreator    = runData.find(r => r.agent === "creator");
     setStats({
-      totalRaw:  raw.length,
+      totalRaw,
       totalGen:  gen.length,
       drafts:    gen.filter(g => g.status === "draft").length,
       approved:  gen.filter(g => g.status === "approved").length,
       published: gen.filter(g => g.status === "published").length,
       lastResearcher, lastCreator,
-      avgScore: raw.length
-        ? (raw.reduce((s, i) => s + (i.relevance_score || 0), 0) / raw.length).toFixed(1)
-        : 0,
     });
 
     setLoading(false);
@@ -237,6 +252,23 @@ export default function Dashboard() {
   const loadSources = useCallback(async () => {
     const { data } = await supabase.from("sources").select("*").order("created_at", { ascending: true });
     setSources(data ?? []);
+  }, []);
+
+  const loadRawFeed = useCallback(async (page, search) => {
+    const from = (page - 1) * PAGE_SIZE;
+    const to   = from + PAGE_SIZE - 1;
+    let query = supabase
+      .from("raw_content")
+      .select("*", { count: "exact" })
+      .order("fetched_at", { ascending: false })
+      .range(from, to);
+    if (search?.trim()) {
+      query = query.ilike("title", `%${search.trim()}%`);
+    }
+    const { data, error, count } = await query;
+    if (error) { showToast(error.message, "error"); return; }
+    setRawItems(data ?? []);
+    setRawTotal(count ?? 0);
   }, []);
 
   useEffect(() => { loadData(); loadSources(); }, [loadData, loadSources]);
@@ -273,6 +305,12 @@ export default function Dashboard() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  // Raw feed pagination + server-side search
+  useEffect(() => {
+    const t = setTimeout(() => loadRawFeed(rawPage, rawSearch), rawSearch ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [rawPage, rawSearch, loadRawFeed]);
+
   useEffect(() => {
     const ch = supabase.channel("history-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "create_history" }, loadHistory)
@@ -304,6 +342,24 @@ export default function Dashboard() {
 
   const deleteHistoryEntry = async (id) => {
     await supabase.from("create_history").delete().eq("id", id);
+  };
+
+  const deleteRawItem = async (id) => {
+    const { error } = await supabase.from("raw_content").delete().eq("id", id);
+    if (error) { showToast(error.message, "error"); return; }
+    showToast("Item deleted");
+    loadRawFeed(rawPage, rawSearch);
+    loadData();
+  };
+
+  const deleteProcessedRawItems = async () => {
+    if (!confirm("Delete all processed raw items? This cannot be undone.")) return;
+    const { error } = await supabase.from("raw_content").delete().eq("processed", true);
+    if (error) { showToast(error.message, "error"); return; }
+    showToast("Processed items deleted");
+    setRawPage(1);
+    loadRawFeed(1, rawSearch);
+    loadData();
   };
 
   const generateManual = async () => {
@@ -458,17 +514,6 @@ export default function Dashboard() {
     return buckets.map((count, i) => ({ score: `${i}–${i+1}`, count }));
   })();
 
-  const filteredRaw = rawItems.filter(i =>
-    !rawSearch || i.title?.toLowerCase().includes(rawSearch.toLowerCase())
-  );
-
-  const PICKS_THRESHOLD = 8.0;
-  const topPickItems = rawItems
-    .filter(i => !i.processed)
-    .map(i => ({ ...i, impact_score: (i.relevance_score ?? 0) * 0.6 + (i.novelty_score ?? 0) * 0.4 }))
-    .filter(i => i.impact_score >= PICKS_THRESHOLD)
-    .sort((a, b) => b.impact_score - a.impact_score);
-
   const API_SOURCES = [
     {
       id:          "bidclub",
@@ -484,7 +529,7 @@ export default function Dashboard() {
   const NAV_ITEMS = [
     { id: "queue",   label: "Content Queue", icon: <LayersIcon />,   count: stats?.drafts },
     { id: "picks",   label: "Top Picks",      icon: <StarIcon />,     count: topPickItems.length },
-    { id: "raw",     label: "Raw Feed",       icon: <RssIcon />,      count: rawItems.length },
+    { id: "raw",     label: "Raw Feed",       icon: <RssIcon />,      count: rawTotal },
     { id: "runs",    label: "Pipeline Runs",  icon: <ActivityIcon />, count: null },
     { id: "sources", label: "Sources",        icon: <DatabaseIcon />, count: sources.length },
     { id: "create",  label: "Create",         icon: <ComposeIcon />,  count: null },
@@ -564,9 +609,10 @@ export default function Dashboard() {
           .item-row-scores { display: none !important; }
           .item-row-right { width: 100%; justify-content: space-between !important;
             border-top: 1px solid ${C.border}; padding-top: 10px; margin-top: 4px; }
-          .queue-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 10px !important; width: 100% !important; overflow: hidden !important; }
-          .queue-row-actions { width: 100% !important; flex-shrink: 0; border-top: 1px solid ${C.border}; padding-top: 10px; display: flex !important; gap: 8px !important; }
-          .queue-row-actions button { flex: 1 !important; }
+          .queue-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 10px !important; width: 100% !important; max-width: 100% !important; overflow: hidden !important; box-sizing: border-box !important; }
+          .queue-row-actions { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; flex-shrink: 0; border-top: 1px solid ${C.border}; padding-top: 10px; display: flex !important; gap: 8px !important; overflow: hidden !important; }
+          .queue-row-actions button { flex: 1 1 0% !important; min-width: 0 !important; max-width: 100% !important; overflow: hidden !important; }
+          .queue-grid { width: 100% !important; overflow: hidden !important; }
         }
       `}</style>
 
@@ -780,7 +826,7 @@ export default function Dashboard() {
 
         {/* ── Content Queue ── */}
         {tab === "queue" && (
-          <div style={{ display: "grid", gridTemplateColumns: selected && !isMobile ? "1fr 460px" : "1fr", gap: 16 }}>
+          <div className="queue-grid" style={{ display: "grid", gridTemplateColumns: selected && !isMobile ? "1fr 460px" : "1fr", gap: 16 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {genItems.length === 0 && (
                 <EmptyState icon="✦" title="No content yet"
@@ -1029,33 +1075,51 @@ export default function Dashboard() {
         {/* ── Raw Feed ── */}
         {tab === "raw" && (
           <div>
-            <div style={{ position: "relative", marginBottom: 16 }}>
-              <span style={{ position: "absolute", left: 14, top: "50%",
-                transform: "translateY(-50%)", color: C.muted, pointerEvents: "none" }}>
-                <SearchIcon />
+            {/* Toolbar */}
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+              <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
+                <span style={{ position: "absolute", left: 14, top: "50%",
+                  transform: "translateY(-50%)", color: C.muted, pointerEvents: "none" }}>
+                  <SearchIcon />
+                </span>
+                <input
+                  value={rawSearch}
+                  onChange={e => { setRawSearch(e.target.value); setRawPage(1); }}
+                  placeholder="Search raw feed…"
+                  aria-label="Search raw feed"
+                  style={{
+                    background: C.glass, border: `1px solid ${C.border}`,
+                    color: C.text, borderRadius: 10, padding: "10px 16px 10px 38px",
+                    fontSize: 13, width: "100%", fontFamily: "'Inter', sans-serif",
+                    transition: "border-color 0.15s",
+                  }}
+                />
+              </div>
+              <span style={{ color: C.muted, fontSize: 12, fontFamily: "'DM Mono', monospace",
+                whiteSpace: "nowrap", flexShrink: 0 }}>
+                {rawTotal} item{rawTotal !== 1 ? "s" : ""}
               </span>
-              <input
-                value={rawSearch}
-                onChange={e => setRawSearch(e.target.value)}
-                placeholder="Search raw feed…"
-                aria-label="Search raw feed"
+              <button
+                onClick={deleteProcessedRawItems}
                 style={{
-                  background: C.glass, border: `1px solid ${C.border}`,
-                  color: C.text, borderRadius: 10, padding: "10px 16px 10px 38px",
-                  fontSize: 13, width: "100%", fontFamily: "'Inter', sans-serif",
-                  transition: "border-color 0.15s",
-                }}
-              />
+                  background: "none", color: C.error + "88",
+                  border: `1px solid ${C.error}33`, padding: "7px 14px",
+                  borderRadius: 8, cursor: "pointer", fontSize: 11,
+                  fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em",
+                  whiteSpace: "nowrap", flexShrink: 0, transition: "all 0.15s",
+                }}>
+                Delete processed
+              </button>
             </div>
 
-            {filteredRaw.length === 0 && (
+            {rawItems.length === 0 && (
               rawSearch
                 ? <EmptyState icon="🔍" title="No results" message={`Nothing matched "${rawSearch}"`} />
                 : <EmptyState icon="📡" title="No items yet" message="Trigger the researcher agent to start fetching content." />
             )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {filteredRaw.map(item => (
+              {rawItems.map(item => (
                 <div key={item.id} className="glass-row item-row" style={{
                   ...glass, borderRadius: 12, padding: "14px 20px",
                   display: "flex", alignItems: "center", gap: 14,
@@ -1081,7 +1145,7 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  <div className="item-row-right" style={{ display: "flex", gap: 16, alignItems: "center", flexShrink: 0 }}>
+                  <div className="item-row-right" style={{ display: "flex", gap: 12, alignItems: "center", flexShrink: 0 }}>
                     <div className="item-row-scores" style={{ textAlign: "center", minWidth: 32 }}>
                       <div style={{ fontSize: 17, fontWeight: 800, fontFamily: "'Syne', sans-serif",
                         color: (item.relevance_score ?? 0) >= 7 ? C.accent : C.muted }}>
@@ -1119,10 +1183,56 @@ export default function Dashboard() {
                         </button>
                       )
                     }
+                    <button
+                      className="del-btn"
+                      aria-label={`Delete item: ${item.title}`}
+                      onClick={e => { e.stopPropagation(); deleteRawItem(item.id); }}
+                      style={{
+                        background: "none", color: C.muted, border: "none",
+                        cursor: "pointer", width: 28, height: 28, borderRadius: 6,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, transition: "all 0.15s", flexShrink: 0,
+                      }}>✕</button>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Pagination */}
+            {rawTotal > PAGE_SIZE && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                paddingTop: 20, marginTop: 8 }}>
+                <span style={{ color: C.muted, fontSize: 12, fontFamily: "'DM Mono', monospace" }}>
+                  {(rawPage - 1) * PAGE_SIZE + 1}–{Math.min(rawPage * PAGE_SIZE, rawTotal)} of {rawTotal}
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => setRawPage(p => p - 1)}
+                    disabled={rawPage === 1}
+                    style={{
+                      background: rawPage === 1 ? "none" : C.glass2,
+                      color: rawPage === 1 ? C.muted + "44" : C.muted,
+                      border: `1px solid ${rawPage === 1 ? C.border + "44" : C.border}`,
+                      padding: "6px 16px", borderRadius: 8,
+                      cursor: rawPage === 1 ? "not-allowed" : "pointer",
+                      fontSize: 12, fontFamily: "'DM Mono', monospace",
+                      transition: "all 0.15s",
+                    }}>← Prev</button>
+                  <button
+                    onClick={() => setRawPage(p => p + 1)}
+                    disabled={rawPage * PAGE_SIZE >= rawTotal}
+                    style={{
+                      background: rawPage * PAGE_SIZE >= rawTotal ? "none" : C.glass2,
+                      color: rawPage * PAGE_SIZE >= rawTotal ? C.muted + "44" : C.muted,
+                      border: `1px solid ${rawPage * PAGE_SIZE >= rawTotal ? C.border + "44" : C.border}`,
+                      padding: "6px 16px", borderRadius: 8,
+                      cursor: rawPage * PAGE_SIZE >= rawTotal ? "not-allowed" : "pointer",
+                      fontSize: 12, fontFamily: "'DM Mono', monospace",
+                      transition: "all 0.15s",
+                    }}>Next →</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
