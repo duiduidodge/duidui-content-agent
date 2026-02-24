@@ -581,19 +581,6 @@ export default function Dashboard() {
         .mobile-header { display: none; }
         .bottom-tab-nav { display: none; }
 
-        /* ── Narrow / Tablet: sidebar stays, preview becomes fullscreen overlay ── */
-        @media (max-width: 1099px) {
-          .queue-grid { grid-template-columns: 1fr !important; }
-          .preview-side-panel {
-            position: fixed !important; inset: 0 !important; z-index: 150 !important;
-            background: #0d0d1a !important; overflow-y: auto !important;
-            padding: 24px 24px 100px !important; max-height: 100vh !important;
-            border-radius: 0 !important; border: none !important;
-            backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
-            top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-          }
-        }
-
         /* ── Mobile ── */
         @media (max-width: 767px) {
           .desktop-sidebar { display: none !important; }
@@ -625,7 +612,6 @@ export default function Dashboard() {
           .queue-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 10px !important; width: 100% !important; max-width: 100% !important; overflow: hidden !important; box-sizing: border-box !important; }
           .queue-row-actions { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; flex-shrink: 0; border-top: 1px solid ${C.border}; padding-top: 10px; display: flex !important; gap: 8px !important; overflow: hidden !important; }
           .queue-row-actions button { flex: 1 1 0% !important; min-width: 0 !important; max-width: 100% !important; overflow: hidden !important; }
-          .queue-grid { width: 100% !important; overflow: hidden !important; }
         }
       `}</style>
 
@@ -839,143 +825,152 @@ export default function Dashboard() {
 
         {/* ── Content Queue ── */}
         {tab === "queue" && (
-          <div className="queue-grid" style={{ display: "grid", gridTemplateColumns: selected ? "1fr 460px" : "1fr", gap: 16 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {genItems.length === 0 && (
-                <EmptyState icon="✦" title="No content yet"
-                  message="Trigger the creator agent from GitHub Actions to generate your first content pieces." />
-              )}
-              {genItems.map(item => (
-                <div key={item.id} className="glass-row queue-row"
-                  role="button" tabIndex={0}
-                  aria-pressed={selected?.id === item.id}
-                  onClick={() => setSelected(selected?.id === item.id ? null : item)}
-                  onKeyDown={e => e.key === "Enter" && setSelected(selected?.id === item.id ? null : item)}
-                  style={{
-                    ...glass,
-                    borderRadius: 12, padding: "16px 20px",
-                    cursor: "pointer",
-                    border: `1px solid ${selected?.id === item.id ? C.accent + "44" : C.border}`,
-                    background: selected?.id === item.id ? `${C.accent}08` : C.glass,
-                    display: "flex", alignItems: "center", gap: 16,
-                    animation: "fadeIn 0.2s ease",
-                  }}
-                >
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                    background: item.platform === "twitter_thread" ? C.accent2 + "20"
-                      : item.platform === "facebook_post" ? "#1877f222" : C.accent3 + "20",
-                    border: `1px solid ${item.platform === "twitter_thread" ? C.accent2 + "40"
-                      : item.platform === "facebook_post" ? "#1877f244" : C.accent3 + "40"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-                  }}>
-                    {item.platform === "twitter_thread" ? "𝕏"
-                     : item.platform === "facebook_post" ? "f"
-                     : "📝"}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {genItems.length === 0 && (
+              <EmptyState icon="✦" title="No content yet"
+                message="Trigger the creator agent from GitHub Actions to generate your first content pieces." />
+            )}
+            {genItems.map(item => (
+              <div key={item.id} className="glass-row queue-row"
+                role="button" tabIndex={0}
+                aria-pressed={selected?.id === item.id}
+                onClick={() => setSelected(selected?.id === item.id ? null : item)}
+                onKeyDown={e => e.key === "Enter" && setSelected(selected?.id === item.id ? null : item)}
+                style={{
+                  ...glass,
+                  borderRadius: 12, padding: "16px 20px",
+                  cursor: "pointer",
+                  border: `1px solid ${selected?.id === item.id ? C.accent + "44" : C.border}`,
+                  background: selected?.id === item.id ? `${C.accent}08` : C.glass,
+                  display: "flex", alignItems: "center", gap: 16,
+                  animation: "fadeIn 0.2s ease",
+                }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: item.platform === "twitter_thread" ? C.accent2 + "20"
+                    : item.platform === "facebook_post" ? "#1877f222" : C.accent3 + "20",
+                  border: `1px solid ${item.platform === "twitter_thread" ? C.accent2 + "40"
+                    : item.platform === "facebook_post" ? "#1877f244" : C.accent3 + "40"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                }}>
+                  {item.platform === "twitter_thread" ? "𝕏"
+                   : item.platform === "facebook_post" ? "f"
+                   : "📝"}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    color: C.text }}>
+                    {item.title || item.hook?.slice(0, 80)}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      color: C.text }}>
-                      {item.title || item.hook?.slice(0, 80)}
-                    </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      {badge(item.platform === "twitter_thread" ? "Thread"
-                        : item.platform === "facebook_post" ? "Facebook"
-                        : "Blog", C.accent2)}
-                      {badge(item.status, STATUS_COLOR[item.status])}
-                      <span style={{ color: C.muted, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>
-                        {item.raw_content?.source && SOURCE_ICON[item.raw_content.source]}
-                        {" "}{formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="queue-row-actions" style={{ display: "flex", gap: 8 }}>
-                    {item.status === "draft" && <>
-                      <button
-                        aria-label="Approve content"
-                        onClick={e => { e.stopPropagation(); updateStatus(item.id, "approved"); }}
-                        style={{ background: C.accent + "18", color: C.accent,
-                          border: `1px solid ${C.accent}33`, padding: "6px 14px",
-                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
-                        Approve
-                      </button>
-                      <button
-                        aria-label="Reject content"
-                        onClick={e => { e.stopPropagation(); updateStatus(item.id, "rejected"); }}
-                        style={{ background: C.error + "18", color: C.error,
-                          border: `1px solid ${C.error}33`, padding: "6px 14px",
-                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
-                        Reject
-                      </button>
-                    </>}
-                    {item.status === "approved" && (
-                      <button
-                        aria-label="Publish content"
-                        onClick={e => { e.stopPropagation(); updateStatus(item.id, "published"); }}
-                        style={{ background: C.success + "18", color: C.success,
-                          border: `1px solid ${C.success}33`, padding: "6px 14px",
-                          borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
-                        Publish
-                      </button>
-                    )}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    {badge(item.platform === "twitter_thread" ? "Thread"
+                      : item.platform === "facebook_post" ? "Facebook"
+                      : "Blog", C.accent2)}
+                    {badge(item.status, STATUS_COLOR[item.status])}
+                    <span style={{ color: C.muted, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>
+                      {item.raw_content?.source && SOURCE_ICON[item.raw_content.source]}
+                      {" "}{formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Preview panel */}
-            {selected && (
-              <div className="preview-side-panel" style={{
-                ...glass, padding: "28px", position: "sticky", top: 32,
-                maxHeight: "calc(100vh - 64px)", overflowY: "auto",
-                animation: "fadeIn 0.2s ease",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between",
-                  alignItems: "flex-start", marginBottom: 24 }}>
-                  <div>
-                    <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800,
-                      fontSize: 15, color: C.text, marginBottom: 4 }}>
-                      {selected.platform === "twitter_thread" ? "𝕏 Thread Preview" : "📝 Article Preview"}
-                    </div>
-                    {selected.impact_score && (
-                      <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace",
-                        color: C.accent }}>
-                        Impact {selected.impact_score.toFixed(1)}/10
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    aria-label="Close preview"
-                    onClick={() => setSelected(null)}
-                    style={{ background: C.glass2, border: `1px solid ${C.border}`,
-                      color: C.muted, cursor: "pointer", width: 32, height: 32,
-                      borderRadius: 8, display: "flex", alignItems: "center",
-                      justifyContent: "center", fontSize: 16, flexShrink: 0 }}>✕</button>
+                <div className="queue-row-actions" style={{ display: "flex", gap: 8 }}>
+                  {item.status === "draft" && <>
+                    <button
+                      aria-label="Approve content"
+                      onClick={e => { e.stopPropagation(); updateStatus(item.id, "approved"); }}
+                      style={{ background: C.accent + "18", color: C.accent,
+                        border: `1px solid ${C.accent}33`, padding: "6px 14px",
+                        borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
+                      Approve
+                    </button>
+                    <button
+                      aria-label="Reject content"
+                      onClick={e => { e.stopPropagation(); updateStatus(item.id, "rejected"); }}
+                      style={{ background: C.error + "18", color: C.error,
+                        border: `1px solid ${C.error}33`, padding: "6px 14px",
+                        borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
+                      Reject
+                    </button>
+                  </>}
+                  {item.status === "approved" && (
+                    <button
+                      aria-label="Publish content"
+                      onClick={e => { e.stopPropagation(); updateStatus(item.id, "published"); }}
+                      style={{ background: C.success + "18", color: C.success,
+                        border: `1px solid ${C.success}33`, padding: "6px 14px",
+                        borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, flex: 1 }}>
+                      Publish
+                    </button>
+                  )}
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
 
+        {/* ── Article Preview overlay (always fullscreen, all screen sizes) ── */}
+        {tab === "queue" && selected && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Article preview"
+            style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", justifyContent: "flex-end" }}
+          >
+            {/* Backdrop */}
+            <div
+              onClick={() => setSelected(null)}
+              style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+            />
+            {/* Drawer panel */}
+            <div style={{
+              position: "relative",
+              width: isMobile ? "100vw" : 520,
+              maxWidth: "100vw",
+              background: "#0d0d1a",
+              borderLeft: `1px solid ${C.border}`,
+              display: "flex", flexDirection: "column",
+              animation: "slideIn 0.22s ease",
+              overflowY: "auto",
+            }}>
+              {/* Header */}
+              <div style={{ padding: "24px 28px 0", display: "flex",
+                justifyContent: "space-between", alignItems: "flex-start",
+                marginBottom: 20, flexShrink: 0 }}>
+                <div>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800,
+                    fontSize: 16, color: C.text, marginBottom: 4 }}>
+                    {selected.platform === "twitter_thread" ? "𝕏 Thread Preview" : "📝 Article Preview"}
+                  </div>
+                  {selected.impact_score && (
+                    <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: C.accent }}>
+                      Impact {selected.impact_score.toFixed(1)}/10
+                    </div>
+                  )}
+                </div>
+                <button
+                  aria-label="Close preview"
+                  onClick={() => setSelected(null)}
+                  style={{ background: C.glass2, border: `1px solid ${C.border}`,
+                    color: C.muted, cursor: "pointer", width: 32, height: 32,
+                    borderRadius: 8, display: "flex", alignItems: "center",
+                    justifyContent: "center", fontSize: 16, flexShrink: 0 }}>✕</button>
+              </div>
+
+              {/* Content */}
+              <div style={{ padding: "0 28px 80px", flex: 1 }}>
                 {selected.title && (
                   <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 16,
                     lineHeight: 1.4, color: C.text }}>{selected.title}</div>
                 )}
-
                 {selected.raw_content?.source_url && (
-                  <a
-                    href={selected.raw_content.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "inline-block",
-                      color: C.accent,
-                      fontSize: 12,
-                      marginBottom: 16,
-                      textDecoration: "none",
-                    }}
-                  >
+                  <a href={selected.raw_content.source_url} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "inline-block", color: C.accent, fontSize: 12,
+                      marginBottom: 16, textDecoration: "none" }}>
                     Open source article →
                   </a>
                 )}
-
                 {(selected.tags ?? []).length > 0 && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
                     {selected.tags.map(t => (
@@ -985,7 +980,6 @@ export default function Dashboard() {
                     ))}
                   </div>
                 )}
-
                 {selected.platform === "twitter_thread" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {selected.body?.split("\n---\n").map((tweet, i) => (
@@ -1008,7 +1002,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         )}
 
