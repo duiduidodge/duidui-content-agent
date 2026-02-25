@@ -228,7 +228,7 @@ export default function Dashboard() {
     const picks = (picksRes.data ?? [])
       .map(i => ({ ...i, impact_score: (i.relevance_score ?? 0) * 0.6 + (i.novelty_score ?? 0) * 0.4 }))
       .filter(i => i.impact_score >= PICKS_THRESHOLD)
-      .sort((a, b) => b.impact_score - a.impact_score);
+      .sort((a, b) => new Date(b.fetched_at) - new Date(a.fetched_at));
 
     setTopPickItems(picks);
     setGenItems(gen);
